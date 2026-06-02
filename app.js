@@ -62,10 +62,10 @@ if (form) {
     let isValid = true;
 
     /* Validar campos required */
-    const required = ['nombre','apellido','documento','fecha_nacimiento','genero','celular','equipo','categoria'];
+    const required = ['nombre','apellido','documento','fecha_nacimiento','genero','celular'];
     required.forEach(id => {
       const el = document.getElementById(id);
-      if (!validateField(el)) isValid = false;
+      if (!el || !validateField(el)) isValid = false;
     });
 
     /* Validar checkbox */
@@ -92,9 +92,9 @@ if (form) {
       celular:       document.getElementById('celular').value.trim(),
       email:         document.getElementById('email').value.trim(),
       procedencia:   document.getElementById('procedencia').value.trim(),
-      equipo:        document.getElementById('equipo').value.trim(),
-      categoria:     document.getElementById('categoria').value,
-      camiseta:      document.getElementById('camiseta').value,
+      equipo:        document.getElementById('equipo')?.value.trim() || '',
+      categoria:     document.getElementById('categoria')?.value || '',
+      camiseta:      document.getElementById('camiseta')?.value || '',
       posicion:      document.getElementById('posicion').value,
       condiciones:   document.getElementById('condiciones').value.trim(),
       fecha_inscripcion: now.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })

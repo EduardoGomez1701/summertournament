@@ -208,6 +208,64 @@ function adminLogout() {
   if (document.getElementById('admin-pass')) document.getElementById('admin-pass').value = '';
 }
 
+/* ===== IMPORT / EXPORT JSON ===== */
+function downloadJSON() {
+  const players = getPlayers();
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const fn = `inscripciones_${dateStr}.json`;
+  const blob = new Blob([JSON.stringify(players, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fn;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function handleImportJSONFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) throw new Error('JSON inválido');
+      const existing = getPlayers();
+      let added = 0;
+      imported.forEach(p => {
+        const exists = existing.some(ep => (ep.documento && ep.documento === p.documento) || (ep.id && ep.id === p.id));
+        if (!exists) { existing.push(p); added++; }
+      });
+      if (added) {
+        savePlayers(existing);
+        renderStats();
+        renderTable();
+      }
+      alert(`Importado: ${imported.length} registros. Añadidos: ${added}.`);
+    } catch (err) {
+      alert('Error al importar JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* Conectar botón/entrada si existen en la página */
+document.addEventListener('DOMContentLoaded', () => {
+  const importBtn = document.getElementById('import-json-btn');
+  const importInput = document.getElementById('import-json');
+  if (importBtn && importInput) {
+    importBtn.addEventListener('click', () => importInput.click());
+    importInput.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) handleImportJSONFile(f);
+      // reset input to allow same file to be selected again
+      importInput.value = '';
+    });
+  }
+});
+
 /* ===== STATS ===== */
 function renderStats() {
   const players  = getPlayers();

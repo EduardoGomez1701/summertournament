@@ -36,9 +36,8 @@ body {
 }
 
 .side-rail {
-  position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
+  position: absolute;
+  top: 16px;
   width: 140px;
   height: 520px;
   overflow: hidden;
@@ -46,6 +45,9 @@ body {
   pointer-events: none;
   opacity: 0.98;
 }
+
+.side-left { left: 12px; }
+.side-right { right: 12px; }
 
 .side-left { left: 12px; }
 .side-right { right: 12px; }

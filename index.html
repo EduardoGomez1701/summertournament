@@ -1,12 +1,286 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prueba</title>
-    <p>Hola Mundo</p>
-</head>
-<body>
-    
-</body>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Torneo Veraneal de Baloncesto · Santander de Quilichao</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- ===== FORMULARIO DE INSCRIPCIÓN ===== -->
+    <div id="page-form" class="page active">
+      <header class="hero">
+        <div class="hero-bg"></div>
+        <div class="hero-content">
+          <div class="ball-deco">🏀</div>
+          <span class="chip">Inscripciones abiertas · 2026</span>
+          <h1>Torneo Veraneal<br />de Baloncesto</h1>
+          <p class="subhead">Santander de Quilichao · Cauca</p>
+        </div>
+      </header>
+
+      <main class="container">
+        <div class="card form-card">
+          <form id="registration-form" novalidate>
+            <!-- Datos personales -->
+            <div class="section-title">
+              <span class="section-icon">👤</span> Datos personales
+            </div>
+
+            <div class="row-2">
+              <div class="field">
+                <label for="nombre">Nombre <span class="req">*</span></label>
+                <input
+                  type="text"
+                  id="nombre"
+                  name="nombre"
+                  placeholder="Tu nombre"
+                  required
+                />
+                <span class="err-msg">Campo requerido</span>
+              </div>
+              <div class="field">
+                <label for="apellido"
+                  >Apellido <span class="req">*</span></label
+                >
+                <input
+                  type="text"
+                  id="apellido"
+                  name="apellido"
+                  placeholder="Tu apellido"
+                  required
+                />
+                <span class="err-msg">Campo requerido</span>
+              </div>
+            </div>
+
+            <div class="row-2">
+              <div class="field">
+                <label for="documento"
+                  >N° Documento (CC/TI) <span class="req">*</span></label
+                >
+                <input
+                  type="number"
+                  id="documento"
+                  name="documento"
+                  placeholder="Número de documento"
+                  required
+                />
+                <span class="err-msg">Campo requerido</span>
+              </div>
+              <div class="field">
+                <label for="fecha_nacimiento"
+                  >Fecha de nacimiento <span class="req">*</span></label
+                >
+                <input
+                  type="date"
+                  id="fecha_nacimiento"
+                  name="fecha_nacimiento"
+                  required
+                />
+                <span class="err-msg">Campo requerido</span>
+              </div>
+            </div>
+
+            <div class="row-2">
+              <div class="field">
+                <label for="genero">Género <span class="req">*</span></label>
+                <select id="genero" name="genero" required>
+                  <option value="">Seleccionar</option>
+                  <option value="Masculino">Masculino</option>
+                  <option value="Femenino">Femenino</option>
+                  <option value="Otro">Otro</option>
+                </select>
+                <span class="err-msg">Selecciona una opción</span>
+              </div>
+              <div class="field">
+                <label for="edad">Edad</label>
+                <input
+                  type="number"
+                  id="edad"
+                  name="edad"
+                  placeholder="Años"
+                  min="8"
+                  max="99"
+                  readonly
+                />
+              </div>
+            </div>
+
+            <!-- Contacto -->
+            <div class="section-title">
+              <span class="section-icon">📱</span> Contacto
+            </div>
+
+            <div class="row-2">
+              <div class="field">
+                <label for="celular">Celular <span class="req">*</span></label>
+                <input
+                  type="tel"
+                  id="celular"
+                  name="celular"
+                  placeholder="3XX XXX XXXX"
+                  required
+                />
+                <span class="err-msg">Campo requerido</span>
+              </div>
+              <div class="field">
+                <label for="email">Correo electrónico</label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  placeholder="correo@ejemplo.com"
+                />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="procedencia">Barrio / Municipio de procedencia</label>
+              <input
+                type="text"
+                id="procedencia"
+                name="procedencia"
+                placeholder="Ej: Centro, Santander de Quilichao"
+              />
+            </div>
+
+            <!-- Datos deportivos -->
+            <div class="section-title">
+              <span class="section-icon">🏀</span> Datos deportivos
+            </div>
+            <!-- 
+          <div class="field">
+            <label for="equipo">Nombre del equipo <span class="req">*</span></label>
+            <input type="text" id="equipo" name="equipo" placeholder="Nombre de tu equipo" required />
+            <span class="err-msg">Campo requerido</span>
+          </div>
+-->
+            <!-- 
+            <div class="row-2">
+              <div class="field">
+                <label for="categoria"
+                  >Categoría <span class="req">*</span></label
+                >
+                <select id="categoria" name="categoria" required>
+                  <option value="">Seleccionar</option>
+                  <option value="Infantil (8–12 años)">
+                    Infantil (8–12 años)
+                  </option>
+                  <option value="Juvenil (13–17 años)">
+                    Juvenil (13–17 años)
+                  </option>
+                  <option value="Mayor (18–35 años)">Mayor (18–35 años)</option>
+                  <option value="Veteranos (+35 años)">
+                    Veteranos (+35 años)
+                  </option>
+                  <option value="Mixto">Mixto</option>
+                </select>
+                <span class="err-msg">Selecciona una categoría</span>
+              </div>
+              <div class="field">
+                <label for="camiseta">Número de camiseta</label>
+                <input
+                  type="number"
+                  id="camiseta"
+                  name="camiseta"
+                  placeholder="#"
+                  min="0"
+                  max="99"
+                />
+              </div>
+            </div>
+-->
+            <div class="field">
+              <label>Posición en cancha</label>
+              <div class="position-grid" id="position-grid">
+                <button type="button" class="pos-btn" data-pos="Base">
+                  Base
+                </button>
+                <button type="button" class="pos-btn" data-pos="Escolta">
+                  Escolta
+                </button>
+                <button type="button" class="pos-btn" data-pos="Alero">
+                  Alero
+                </button>
+                <button type="button" class="pos-btn" data-pos="Ala-Pivot">
+                  Ala-Pivot
+                </button>
+                <button type="button" class="pos-btn" data-pos="Pivot">
+                  Pivot
+                </button>
+                <button type="button" class="pos-btn" data-pos="Cualquiera">
+                  Cualquiera
+                </button>
+              </div>
+              <input type="hidden" id="posicion" name="posicion" value="" />
+            </div>
+
+            <!-- Info adicional -->
+            <div class="section-title">
+              <span class="section-icon">📋</span> Información adicional
+            </div>
+
+            <div class="field">
+              <label for="condiciones"
+                >Alergias o condiciones médicas relevantes</label
+              >
+              <textarea
+                id="condiciones"
+                name="condiciones"
+                rows="3"
+                placeholder="Ej: ninguna / asma leve / alergia al polvo"
+              ></textarea>
+            </div>
+
+            <div class="checkbox-row">
+              <label class="custom-checkbox">
+                <input type="checkbox" id="acepta" name="acepta" required />
+                <span class="checkmark"></span>
+                <span class="check-text"
+                  >Acepto el <strong>reglamento del torneo</strong> y autorizo
+                  el uso de mis datos con fines organizativos.</span
+                >
+              </label>
+              <span class="err-msg" id="acepta-err"
+                >Debes aceptar el reglamento</span
+              >
+            </div>
+
+            <button type="submit" class="btn-submit">
+              <span>Enviar inscripción</span>
+              <span class="btn-arrow">→</span>
+            </button>
+          </form>
+        </div>
+        <!-- /form-card -->
+
+        <div class="footer-links">
+          <span>🔒 Tus datos son confidenciales</span>
+          <a href="admin.html" class="admin-link">Acceso administrador</a>
+        </div>
+      </main>
+
+      <!-- Modal de éxito -->
+      <div id="success-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+          <div class="modal-icon">✅</div>
+          <h2>¡Inscripción exitosa!</h2>
+          <p>
+            Tu inscripción al <strong>Torneo Veraneal de Baloncesto</strong> ha
+            sido registrada correctamente.
+          </p>
+          <p class="modal-name" id="modal-name"></p>
+          <button class="btn-modal" onclick="closeModal()">Aceptar</button>
+        </div>
+      </div>
+    </div>
+    <!-- /page-form -->
+
+    <script src="app.js"></script>
+  </body>
 </html>

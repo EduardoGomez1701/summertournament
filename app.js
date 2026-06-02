@@ -1,0 +1,310 @@
+/* =====================================================
+   TORNEO VERANEAL DE BALONCESTO · Santander de Quilichao
+   app.js — Formulario + Admin Panel
+   ===================================================== */
+
+const STORAGE_KEY = 'torneo_baloncesto_2026';
+const ADMIN_PASS  = '123'; //
+
+/* ==================== STORAGE ==================== */
+function getPlayers() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+
+function savePlayers(list) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+/* ==================== FORMULARIO ==================== */
+const form = document.getElementById('registration-form');
+if (form) {
+
+  /* Calcular edad automáticamente */
+  document.getElementById('fecha_nacimiento').addEventListener('change', function () {
+    const dob = new Date(this.value);
+    if (isNaN(dob)) return;
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+    document.getElementById('edad').value = age >= 0 ? age : '';
+  });
+
+  /* Selección de posición */
+  document.querySelectorAll('.pos-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      document.getElementById('posicion').value = this.dataset.pos;
+    });
+  });
+
+  /* Validación campo individual */
+  function validateField(input) {
+    const field = input.closest('.field');
+    const err   = field ? field.querySelector('.err-msg') : null;
+    const valid = input.checkValidity();
+    input.classList.toggle('error', !valid);
+    if (err) err.classList.toggle('visible', !valid);
+    return valid;
+  }
+
+  form.querySelectorAll('input, select, textarea').forEach(el => {
+    el.addEventListener('blur', () => validateField(el));
+    el.addEventListener('input', () => { if (el.classList.contains('error')) validateField(el); });
+  });
+
+  /* Submit */
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    let isValid = true;
+
+    /* Validar campos required */
+    const required = ['nombre','apellido','documento','fecha_nacimiento','genero','celular','equipo','categoria'];
+    required.forEach(id => {
+      const el = document.getElementById(id);
+      if (!validateField(el)) isValid = false;
+    });
+
+    /* Validar checkbox */
+    const acepta    = document.getElementById('acepta');
+    const acetaErr  = document.getElementById('acepta-err');
+    if (!acepta.checked) { acetaErr.classList.add('visible'); isValid = false; }
+    else { acetaErr.classList.remove('visible'); }
+
+    if (!isValid) {
+      form.querySelector('.error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    /* Construir objeto jugador */
+    const now = new Date();
+    const player = {
+      id: Date.now(),
+      nombre:        document.getElementById('nombre').value.trim(),
+      apellido:      document.getElementById('apellido').value.trim(),
+      documento:     document.getElementById('documento').value.trim(),
+      fecha_nac:     document.getElementById('fecha_nacimiento').value,
+      edad:          document.getElementById('edad').value,
+      genero:        document.getElementById('genero').value,
+      celular:       document.getElementById('celular').value.trim(),
+      email:         document.getElementById('email').value.trim(),
+      procedencia:   document.getElementById('procedencia').value.trim(),
+      equipo:        document.getElementById('equipo').value.trim(),
+      categoria:     document.getElementById('categoria').value,
+      camiseta:      document.getElementById('camiseta').value,
+      posicion:      document.getElementById('posicion').value,
+      condiciones:   document.getElementById('condiciones').value.trim(),
+      fecha_inscripcion: now.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
+    };
+
+    const players = getPlayers();
+    players.push(player);
+    savePlayers(players);
+
+    /* Mostrar modal */
+    document.getElementById('modal-name').textContent =
+      `${player.nombre} ${player.apellido} · ${player.equipo}`;
+    document.getElementById('success-modal').classList.remove('hidden');
+
+    /* Resetear */
+    form.reset();
+    document.getElementById('edad').value = '';
+    document.getElementById('posicion').value = '';
+    document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.err-msg').forEach(e => e.classList.remove('visible'));
+    document.querySelectorAll('.error').forEach(e => e.classList.remove('error'));
+  });
+}
+
+function closeModal() {
+  document.getElementById('success-modal').classList.add('hidden');
+}
+
+/* ==================== ADMIN ==================== */
+function adminLogin() {
+  const pass  = document.getElementById('admin-pass').value;
+  const errEl = document.getElementById('pass-err');
+
+  if (pass === ADMIN_PASS) {
+    sessionStorage.setItem('admin_auth', '1');
+    document.getElementById('login-page').classList.remove('active');
+    document.getElementById('admin-panel').classList.add('active');
+    renderStats();
+    renderTable();
+    errEl.classList.remove('visible');
+  } else {
+    errEl.classList.add('visible');
+    document.getElementById('admin-pass').classList.add('error');
+  }
+}
+
+/* Permitir Enter en campo contraseña */
+const passField = document.getElementById('admin-pass');
+if (passField) {
+  passField.addEventListener('keydown', e => { if (e.key === 'Enter') adminLogin(); });
+
+  /* Verificar sesión activa */
+  if (sessionStorage.getItem('admin_auth') === '1') {
+    document.getElementById('login-page').classList.remove('active');
+    document.getElementById('admin-panel').classList.add('active');
+    renderStats();
+    renderTable();
+  }
+}
+
+function adminLogout() {
+  sessionStorage.removeItem('admin_auth');
+  document.getElementById('admin-panel').classList.remove('active');
+  document.getElementById('login-page').classList.add('active');
+  if (document.getElementById('admin-pass')) document.getElementById('admin-pass').value = '';
+}
+
+/* ===== STATS ===== */
+function renderStats() {
+  const players  = getPlayers();
+  const equipos  = [...new Set(players.map(p => p.equipo).filter(Boolean))];
+  const catCount = {};
+  players.forEach(p => { catCount[p.categoria] = (catCount[p.categoria] || 0) + 1; });
+  const topCat   = Object.entries(catCount).sort((a,b) => b[1]-a[1])[0];
+
+  const statsRow = document.getElementById('stats-row');
+  if (!statsRow) return;
+
+  statsRow.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total inscritos</div>
+      <div class="stat-value">${players.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Equipos</div>
+      <div class="stat-value">${equipos.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Categoría top</div>
+      <div class="stat-value" style="font-size:1rem; margin-top:4px;">${topCat ? topCat[0].split(' ')[0] : '—'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Última inscripción</div>
+      <div class="stat-value" style="font-size:0.9rem; margin-top:4px;">${players.length ? players[players.length-1].fecha_inscripcion : '—'}</div>
+    </div>
+  `;
+}
+
+/* ===== TABLE ===== */
+function renderTable() {
+  const players  = getPlayers();
+  const search   = (document.getElementById('search-input')?.value || '').toLowerCase();
+  const filterCat = document.getElementById('filter-cat')?.value || '';
+
+  let filtered = players.filter(p => {
+    const matchSearch = !search ||
+      `${p.nombre} ${p.apellido} ${p.equipo}`.toLowerCase().includes(search);
+    const matchCat = !filterCat || p.categoria.includes(filterCat);
+    return matchSearch && matchCat;
+  });
+
+  const tbody  = document.getElementById('table-body');
+  const noData = document.getElementById('no-data');
+  if (!tbody) return;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    noData.classList.remove('hidden');
+    return;
+  }
+
+  noData.classList.add('hidden');
+  tbody.innerHTML = filtered.map((p, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><strong>${p.nombre} ${p.apellido}</strong></td>
+      <td>${p.documento || '—'}</td>
+      <td>${p.edad || '—'}</td>
+      <td>${p.genero || '—'}</td>
+      <td>${p.celular || '—'}</td>
+      <td>${p.email || '—'}</td>
+      <td>${p.equipo || '—'}</td>
+      <td><span class="cat-badge">${p.categoria || '—'}</span></td>
+      <td>${p.posicion || '—'}</td>
+      <td>${p.camiseta || '—'}</td>
+      <td>${p.procedencia || '—'}</td>
+      <td>${p.condiciones || 'Ninguna'}</td>
+      <td>${p.fecha_inscripcion}</td>
+      <td><button class="btn-del" onclick="confirmDelete(${p.id})">Eliminar</button></td>
+    </tr>
+  `).join('');
+}
+
+/* ===== DELETE ===== */
+let pendingDeleteId = null;
+
+function confirmDelete(id) {
+  pendingDeleteId = id;
+  document.getElementById('delete-modal').classList.remove('hidden');
+  document.getElementById('confirm-delete-btn').onclick = doDelete;
+}
+
+function doDelete() {
+  if (!pendingDeleteId) return;
+  const players = getPlayers().filter(p => p.id !== pendingDeleteId);
+  savePlayers(players);
+  pendingDeleteId = null;
+  closeDeleteModal();
+  renderStats();
+  renderTable();
+}
+
+function closeDeleteModal() {
+  document.getElementById('delete-modal').classList.add('hidden');
+  pendingDeleteId = null;
+}
+
+/* ===== EXCEL DOWNLOAD ===== */
+function downloadExcel() {
+  const players = getPlayers();
+
+  if (players.length === 0) {
+    alert('No hay inscripciones para descargar.');
+    return;
+  }
+
+  /* SheetJS debe estar cargado en admin.html */
+  if (typeof XLSX === 'undefined') {
+    alert('Error: librería de Excel no disponible. Verifica tu conexión.');
+    return;
+  }
+
+  const headers = [
+    'N°', 'Nombre', 'Apellido', 'Documento', 'Fecha Nacimiento',
+    'Edad', 'Género', 'Celular', 'Correo', 'Procedencia',
+    'Equipo', 'Categoría', 'Posición', 'N° Camiseta',
+    'Condiciones Médicas', 'Fecha Inscripción'
+  ];
+
+  const rows = players.map((p, i) => [
+    i + 1, p.nombre, p.apellido, p.documento, p.fecha_nac,
+    p.edad, p.genero, p.celular, p.email, p.procedencia,
+    p.equipo, p.categoria, p.posicion, p.camiseta,
+    p.condiciones || 'Ninguna', p.fecha_inscripcion
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+  /* Anchos de columna */
+  ws['!cols'] = [
+    {wch:5},{wch:16},{wch:16},{wch:14},{wch:16},
+    {wch:6},{wch:12},{wch:14},{wch:26},{wch:22},
+    {wch:20},{wch:22},{wch:12},{wch:10},
+    {wch:28},{wch:18}
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Inscripciones');
+
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `Torneo_Baloncesto_Inscripciones_${dateStr}.xlsx`);
+}

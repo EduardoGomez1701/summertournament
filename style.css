@@ -329,6 +329,30 @@ input[readonly] { background: #eef0f5; color: var(--text-muted); cursor: default
 
 .admin-link:hover { color: var(--orange-dark); }
 
+.footer-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding-top: 0.9rem;
+  margin-top: 0.4rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.footer-bottom p {
+  margin: 0;
+}
+
+.footer-bottom p:last-child {
+  color: var(--navy-mid);
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
 /* ===== MODAL ===== */
 .modal-overlay {
   position: fixed; inset: 0;

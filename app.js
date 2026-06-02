@@ -104,6 +104,22 @@ if (form) {
     });
   });
 
+  const camisetaSelect = document.getElementById('camiseta');
+  const camisetaOtraInput = document.getElementById('camiseta_otra');
+  const camisetaOtraWrap = document.getElementById('camiseta-otra-wrap');
+
+  function toggleCamisetaOtra() {
+    const mostrar = camisetaSelect?.value === 'Otra';
+    if (camisetaOtraWrap) camisetaOtraWrap.style.display = mostrar ? 'block' : 'none';
+    if (camisetaOtraInput) {
+      camisetaOtraInput.required = mostrar;
+      camisetaOtraInput.value = mostrar ? camisetaOtraInput.value.trim() : '';
+    }
+  }
+
+  camisetaSelect?.addEventListener('change', toggleCamisetaOtra);
+  toggleCamisetaOtra();
+
   /* Validación campo individual */
   function validateField(input) {
     if (!input) return true;
@@ -141,7 +157,7 @@ if (form) {
       /* Validar campos required */
       const required = [
         'nombre','apellido','documento','fecha_nacimiento','genero','celular',
-        'equipo','categoria','consentimiento','certificado_pago',
+        'altura','peso','consentimiento','certificado_pago',
         'foto_perfil_derecha','foto_perfil_izquierda','foto_frente'
       ];
       required.forEach(id => {
@@ -183,6 +199,10 @@ if (form) {
         readFileAsDataURL(fotoFrente)
       ]);
 
+      const tallaCamiseta = (camisetaSelect?.value === 'Otra')
+        ? (camisetaOtraInput?.value.trim() || '')
+        : (camisetaSelect?.value || '');
+
       const player = {
         id: Date.now(),
         nombre:        document.getElementById('nombre').value.trim(),
@@ -194,9 +214,11 @@ if (form) {
         celular:       document.getElementById('celular').value.trim(),
         email:         document.getElementById('email').value.trim(),
         procedencia:   document.getElementById('procedencia').value.trim(),
+        altura:        document.getElementById('altura')?.value.trim() || '',
+        peso:          document.getElementById('peso')?.value.trim() || '',
         equipo:        document.getElementById('equipo')?.value.trim() || '',
         categoria:     document.getElementById('categoria')?.value || '',
-        camiseta:      document.getElementById('camiseta')?.value || '',
+        camiseta:      tallaCamiseta,
         posicion:      document.getElementById('posicion')?.value || '',
         condiciones:   document.getElementById('condiciones')?.value.trim() || '',
         consentimiento_pdf_name: consentFile?.name || '',
@@ -227,6 +249,7 @@ if (form) {
       form.reset();
       document.getElementById('edad').value = '';
       document.getElementById('posicion').value = '';
+      toggleCamisetaOtra();
       document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.err-msg').forEach(e => e.classList.remove('visible'));
       document.querySelectorAll('.error').forEach(e => e.classList.remove('error'));
@@ -345,11 +368,11 @@ if (document.getElementById('admin-panel')) {
 
 /* ===== STATS ===== */
 async function renderStats() {
-  const players  = await getPlayersDB();
-  const equipos  = [...new Set(players.map(p => p.equipo).filter(Boolean))];
-  const catCount = {};
-  players.forEach(p => { catCount[p.categoria] = (catCount[p.categoria] || 0) + 1; });
-  const topCat   = Object.entries(catCount).sort((a,b) => b[1]-a[1])[0];
+  const players = await getPlayersDB();
+  const alturaTotal = players.reduce((sum, p) => sum + (Number(p.altura) || 0), 0);
+  const pesoTotal   = players.reduce((sum, p) => sum + (Number(p.peso) || 0), 0);
+  const avgAltura   = players.length ? (alturaTotal / players.length).toFixed(1) : '—';
+  const avgPeso     = players.length ? (pesoTotal / players.length).toFixed(1) : '—';
 
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
@@ -360,12 +383,12 @@ async function renderStats() {
       <div class="stat-value">${players.length}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Equipos</div>
-      <div class="stat-value">${equipos.length}</div>
+      <div class="stat-label">Altura promedio</div>
+      <div class="stat-value">${avgAltura} cm</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Categoría top</div>
-      <div class="stat-value" style="font-size:1rem; margin-top:4px;">${topCat ? topCat[0].split(' ')[0] : '—'}</div>
+      <div class="stat-label">Peso promedio</div>
+      <div class="stat-value">${avgPeso} kg</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Última inscripción</div>
@@ -386,15 +409,13 @@ function makeImagePreview(label, data, name) {
 }
 
 async function renderTable() {
-  const players  = await getPlayersDB();
-  const search   = (document.getElementById('search-input')?.value || '').toLowerCase();
-  const filterCat = document.getElementById('filter-cat')?.value || '';
+  const players = await getPlayersDB();
+  const search = (document.getElementById('search-input')?.value || '').toLowerCase();
 
   let filtered = players.filter(p => {
     const matchSearch = !search ||
-      `${p.nombre} ${p.apellido} ${p.equipo}`.toLowerCase().includes(search);
-    const matchCat = !filterCat || p.categoria.includes(filterCat);
-    return matchSearch && matchCat;
+      `${p.nombre} ${p.apellido} ${p.altura || ''} ${p.peso || ''}`.toLowerCase().includes(search);
+    return matchSearch;
   });
 
   const tbody  = document.getElementById('table-body');
@@ -433,8 +454,8 @@ async function renderTable() {
       <td>${p.genero || '—'}</td>
       <td>${p.celular || '—'}</td>
       <td>${p.email || '—'}</td>
-      <td>${p.equipo || '—'}</td>
-      <td><span class="cat-badge">${p.categoria || '—'}</span></td>
+      <td>${p.altura || '—'}</td>
+      <td>${p.peso || '—'}</td>
       <td>${p.posicion || '—'}</td>
       <td>${p.camiseta || '—'}</td>
       <td>${p.procedencia || '—'}</td>
@@ -491,7 +512,7 @@ async function downloadExcel() {
   const headers = [
     'N°', 'Nombre', 'Apellido', 'Documento', 'Fecha Nacimiento',
     'Edad', 'Género', 'Celular', 'Correo', 'Procedencia',
-    'Equipo', 'Categoría', 'Posición', 'N° Camiseta',
+    'Altura', 'Peso', 'Posición', 'Talla Camiseta',
     'Condiciones Médicas', 'Consentimiento PDF', 'Certificado Pago',
     'Foto perfil derecha', 'Foto perfil izquierda', 'Foto frente',
     'Fecha Inscripción'
@@ -500,7 +521,7 @@ async function downloadExcel() {
   const rows = players.map((p, i) => [
     i + 1, p.nombre, p.apellido, p.documento, p.fecha_nac,
     p.edad, p.genero, p.celular, p.email, p.procedencia,
-    p.equipo, p.categoria, p.posicion, p.camiseta,
+    p.altura || '', p.peso || '', p.posicion, p.camiseta,
     p.condiciones || 'Ninguna', p.consentimiento_pdf_name || '',
     p.certificado_pago_name || '', p.foto_perfil_derecha_name || '',
     p.foto_perfil_izquierda_name || '', p.foto_frente_name || '',

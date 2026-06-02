@@ -21,7 +21,11 @@
           <span class="chip">Inscripciones abiertas · 2026</span>
           <h1>Torneo Veraneal<br />de Baloncesto</h1>
           <p class="subhead">Santander de Quilichao · Cauca</p>
-          <img class="hero-logo-center" src="Img/logo.svg" alt="Logo del torneo" />
+          <img
+            class="hero-logo-center"
+            src="Img/logo.svg"
+            alt="Logo del torneo"
+          />
         </div>
       </header>
 
@@ -155,13 +159,60 @@
             <div class="section-title">
               <span class="section-icon">🏀</span> Datos deportivos
             </div>
-            <!-- 
-          <div class="field">
-            <label for="equipo">Nombre del equipo <span class="req">*</span></label>
-            <input type="text" id="equipo" name="equipo" placeholder="Nombre de tu equipo" required />
-            <span class="err-msg">Campo requerido</span>
-          </div>
--->
+
+            <div class="row-2">
+              <div class="field">
+                <label for="altura"
+                  >Altura (cm) <span class="req">*</span></label
+                >
+                <input
+                  type="number"
+                  id="altura"
+                  name="altura"
+                  placeholder="Ej: 180"
+                  min="120"
+                  max="230"
+                  required
+                />
+                <span class="err-msg">Campo requerido</span>
+              </div>
+              <div class="field">
+                <label for="peso">Peso (kg) <span class="req">*</span></label>
+                <input
+                  type="number"
+                  id="peso"
+                  name="peso"
+                  placeholder="Ej: 75"
+                  min="30"
+                  max="200"
+                  required
+                />
+                <span class="err-msg">Campo requerido</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="camiseta">Talla de camiseta</label>
+              <select id="camiseta" name="camiseta">
+                <option value="">Seleccionar</option>
+                <option value="S">S</option>
+                <option value="M">M</option>
+                <option value="L">L</option>
+                <option value="XL">XL</option>
+                <option value="XXL">XXL</option>
+                <option value="Otra">Otra</option>
+              </select>
+            </div>
+
+            <div class="field" id="camiseta-otra-wrap" style="display: none;">
+              <label for="camiseta_otra">Escribe la talla</label>
+              <input
+                type="text"
+                id="camiseta_otra"
+                name="camiseta_otra"
+                placeholder="Ej: XS, 2XL, 3XL..."
+              />
+            </div>
             <!-- 
             <div class="row-2">
               <div class="field">

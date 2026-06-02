@@ -64,17 +64,9 @@
           <input
             type="text"
             id="search-input"
-            placeholder="🔍  Buscar jugador o equipo..."
+            placeholder="🔍  Buscar jugador..."
             oninput="renderTable()"
           />
-          <select id="filter-cat" onchange="renderTable()">
-            <option value="">Todas las categorías</option>
-            <option value="Infantil">Infantil</option>
-            <option value="Juvenil">Juvenil</option>
-            <option value="Mayor">Mayor</option>
-            <option value="Veteranos">Veteranos</option>
-            <option value="Mixto">Mixto</option>
-          </select>
         </div>
         <div class="table-scroll">
           <table id="players-table">
@@ -87,8 +79,8 @@
                 <th>Género</th>
                 <th>Celular</th>
                 <th>Correo</th>
-                <th>Equipo</th>
-                <th>Categoría</th>
+                <th>Altura</th>
+                <th>Peso</th>
                 <th>Posición</th>
                 <th>Camiseta</th>
                 <th>Procedencia</th>

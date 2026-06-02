@@ -42,6 +42,7 @@ if (form) {
 
   /* Validación campo individual */
   function validateField(input) {
+    if (!input) return true;
     const field = input.closest('.field');
     const err   = field ? field.querySelector('.err-msg') : null;
     const valid = input.checkValidity();
@@ -50,22 +51,36 @@ if (form) {
     return valid;
   }
 
+  function readFileAsDataURL(file) {
+    if (!file) return Promise.resolve('');
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
   form.querySelectorAll('input, select, textarea').forEach(el => {
     el.addEventListener('blur', () => validateField(el));
     el.addEventListener('input', () => { if (el.classList.contains('error')) validateField(el); });
   });
 
   /* Submit */
-  form.addEventListener('submit', function (e) {
+  form.addEventListener('submit', async function (e) {
     e.preventDefault();
 
     let isValid = true;
 
     /* Validar campos required */
-    const required = ['nombre','apellido','documento','fecha_nacimiento','genero','celular'];
+    const required = [
+      'nombre','apellido','documento','fecha_nacimiento','genero','celular',
+      'equipo','categoria','consentimiento','certificado_pago',
+      'foto_perfil_derecha','foto_perfil_izquierda','foto_frente'
+    ];
     required.forEach(id => {
       const el = document.getElementById(id);
-      if (!el || !validateField(el)) isValid = false;
+      if (el && !validateField(el)) isValid = false;
     });
 
     /* Validar checkbox */
@@ -81,6 +96,27 @@ if (form) {
 
     /* Construir objeto jugador */
     const now = new Date();
+
+    const consentFile = document.getElementById('consentimiento')?.files[0];
+    const payFile = document.getElementById('certificado_pago')?.files[0];
+    const fotoDerecha = document.getElementById('foto_perfil_derecha')?.files[0];
+    const fotoIzquierda = document.getElementById('foto_perfil_izquierda')?.files[0];
+    const fotoFrente = document.getElementById('foto_frente')?.files[0];
+
+    const [
+      consentimientoData,
+      certificadoPagoData,
+      fotoDerechaData,
+      fotoIzquierdaData,
+      fotoFrenteData
+    ] = await Promise.all([
+      readFileAsDataURL(consentFile),
+      readFileAsDataURL(payFile),
+      readFileAsDataURL(fotoDerecha),
+      readFileAsDataURL(fotoIzquierda),
+      readFileAsDataURL(fotoFrente)
+    ]);
+
     const player = {
       id: Date.now(),
       nombre:        document.getElementById('nombre').value.trim(),
@@ -95,8 +131,18 @@ if (form) {
       equipo:        document.getElementById('equipo')?.value.trim() || '',
       categoria:     document.getElementById('categoria')?.value || '',
       camiseta:      document.getElementById('camiseta')?.value || '',
-      posicion:      document.getElementById('posicion').value,
-      condiciones:   document.getElementById('condiciones').value.trim(),
+      posicion:      document.getElementById('posicion')?.value || '',
+      condiciones:   document.getElementById('condiciones')?.value.trim() || '',
+      consentimiento_pdf_name: consentFile?.name || '',
+      consentimiento_pdf_data: consentimientoData || '',
+      certificado_pago_name: payFile?.name || '',
+      certificado_pago_data: certificadoPagoData || '',
+      foto_perfil_derecha_name: fotoDerecha?.name || '',
+      foto_perfil_derecha_data: fotoDerechaData || '',
+      foto_perfil_izquierda_name: fotoIzquierda?.name || '',
+      foto_perfil_izquierda_data: fotoIzquierdaData || '',
+      foto_frente_name: fotoFrente?.name || '',
+      foto_frente_data: fotoFrenteData || '',
       fecha_inscripcion: now.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
     };
 
@@ -194,6 +240,16 @@ function renderStats() {
 }
 
 /* ===== TABLE ===== */
+function makeFileLink(label, data) {
+  if (!data) return '—';
+  return `<a class="link-btn" href="${data}" target="_blank" rel="noreferrer noopener">${label}</a>`;
+}
+
+function makeImagePreview(label, data, name) {
+  if (!data) return '';
+  return `<a class="thumb-link" href="${data}" target="_blank" rel="noreferrer noopener" title="${label} - ${name || ''}"><img class="thumb-img" src="${data}" alt="${label}" /></a>`;
+}
+
 function renderTable() {
   const players  = getPlayers();
   const search   = (document.getElementById('search-input')?.value || '').toLowerCase();
@@ -217,7 +273,23 @@ function renderTable() {
   }
 
   noData.classList.add('hidden');
-  tbody.innerHTML = filtered.map((p, i) => `
+  tbody.innerHTML = filtered.map((p, i) => {
+    const consentimientoLink = p.consentimiento_pdf_data
+      ? makeFileLink(p.consentimiento_pdf_name || 'Ver consentimiento', p.consentimiento_pdf_data)
+      : '—';
+    const certificadoLink = p.certificado_pago_data
+      ? makeFileLink(p.certificado_pago_name || 'Ver pago', p.certificado_pago_data)
+      : '—';
+    const fotosLinks = [
+      { label: 'Derecha', data: p.foto_perfil_derecha_data, name: p.foto_perfil_derecha_name },
+      { label: 'Izquierda', data: p.foto_perfil_izquierda_data, name: p.foto_perfil_izquierda_name },
+      { label: 'Frente', data: p.foto_frente_data, name: p.foto_frente_name }
+    ]
+      .filter(item => item.data)
+      .map(item => makeImagePreview(item.label, item.data, item.name))
+      .join('') || '—';
+
+    return `
     <tr>
       <td>${i + 1}</td>
       <td><strong>${p.nombre} ${p.apellido}</strong></td>
@@ -232,10 +304,14 @@ function renderTable() {
       <td>${p.camiseta || '—'}</td>
       <td>${p.procedencia || '—'}</td>
       <td>${p.condiciones || 'Ninguna'}</td>
+      <td>${consentimientoLink}</td>
+      <td>${certificadoLink}</td>
+      <td class="thumb-cell">${fotosLinks}</td>
       <td>${p.fecha_inscripcion}</td>
       <td><button class="btn-del" onclick="confirmDelete(${p.id})">Eliminar</button></td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 /* ===== DELETE ===== */
@@ -281,14 +357,19 @@ function downloadExcel() {
     'N°', 'Nombre', 'Apellido', 'Documento', 'Fecha Nacimiento',
     'Edad', 'Género', 'Celular', 'Correo', 'Procedencia',
     'Equipo', 'Categoría', 'Posición', 'N° Camiseta',
-    'Condiciones Médicas', 'Fecha Inscripción'
+    'Condiciones Médicas', 'Consentimiento PDF', 'Certificado Pago',
+    'Foto perfil derecha', 'Foto perfil izquierda', 'Foto frente',
+    'Fecha Inscripción'
   ];
 
   const rows = players.map((p, i) => [
     i + 1, p.nombre, p.apellido, p.documento, p.fecha_nac,
     p.edad, p.genero, p.celular, p.email, p.procedencia,
     p.equipo, p.categoria, p.posicion, p.camiseta,
-    p.condiciones || 'Ninguna', p.fecha_inscripcion
+    p.condiciones || 'Ninguna', p.consentimiento_pdf_name || '',
+    p.certificado_pago_name || '', p.foto_perfil_derecha_name || '',
+    p.foto_perfil_izquierda_name || '', p.foto_frente_name || '',
+    p.fecha_inscripcion
   ]);
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);

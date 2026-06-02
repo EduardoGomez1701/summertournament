@@ -558,6 +558,49 @@ td {
   white-space: nowrap;
 }
 
+.link-btn {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: var(--navy);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--white);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.link-btn:hover {
+  background: #eef3ff;
+  border-color: var(--navy);
+}
+
+.thumb-cell {
+  white-space: normal;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.thumb-img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.thumb-link {
+  display: inline-block;
+  outline: none;
+}
+
+.thumb-link:hover .thumb-img {
+  transform: scale(1.02);
+}
+
 .cat-badge {
   display: inline-block;
   padding: 3px 10px;

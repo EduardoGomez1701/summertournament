@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Torneo Veraneal de Baloncesto · Santander de Quilichao</title>
+    <link rel="icon" href="Img/logo.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="style.css" />
     <link
       href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600&display=swap"
@@ -235,6 +236,89 @@
                 rows="3"
                 placeholder="Ej: ninguna / asma leve / alergia al polvo"
               ></textarea>
+            </div>
+
+            <div class="section-title">
+              <span class="section-icon">📎</span> Documentos
+            </div>
+
+            <div class="field">
+              <label for="consentimiento">
+                Consentimiento informado <span class="req">*</span>
+              </label>
+              <div>
+                <a href="Doc/CI.pdf" target="_blank" download="CI.pdf" class="download-link">
+                  Descargar consentimiento informado
+                </a>
+              </div>
+              <input
+                type="file"
+                id="consentimiento"
+                name="consentimiento"
+                accept="application/pdf"
+                required
+              />
+              <span class="err-msg">Debes cargar el consentimiento informado en PDF</span>
+            </div>
+
+            <div class="field">
+              <label for="certificado_pago">
+                Certificado de pago <span class="req">*</span>
+              </label>
+              <input
+                type="file"
+                id="certificado_pago"
+                name="certificado_pago"
+                accept="application/pdf"
+                required
+              />
+              <span class="err-msg">Debes cargar el certificado de pago</span>
+            </div>
+
+            <div class="section-title">
+              <span class="section-icon">📸</span> Fotos del jugador
+            </div>
+
+            <div class="field">
+              <label for="foto_perfil_derecha">
+                Foto perfil derecha <span class="req">*</span>
+              </label>
+              <input
+                type="file"
+                id="foto_perfil_derecha"
+                name="foto_perfil_derecha"
+                accept="image/*"
+                required
+              />
+              <span class="err-msg">Debes cargar la foto de perfil derecha</span>
+            </div>
+
+            <div class="field">
+              <label for="foto_perfil_izquierda">
+                Foto perfil izquierda <span class="req">*</span>
+              </label>
+              <input
+                type="file"
+                id="foto_perfil_izquierda"
+                name="foto_perfil_izquierda"
+                accept="image/*"
+                required
+              />
+              <span class="err-msg">Debes cargar la foto de perfil izquierda</span>
+            </div>
+
+            <div class="field">
+              <label for="foto_frente">
+                Foto de frente <span class="req">*</span>
+              </label>
+              <input
+                type="file"
+                id="foto_frente"
+                name="foto_frente"
+                accept="image/*"
+                required
+              />
+              <span class="err-msg">Debes cargar la foto de frente</span>
             </div>
 
             <div class="checkbox-row">

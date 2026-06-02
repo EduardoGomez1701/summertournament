@@ -8,71 +8,8 @@ const ADMIN_PASS  = '123'; //
 const DB_NAME = 'TorneoBaloncesto';
 const DB_VERSION = 1;
 const DB_STORE = 'inscripciones';
-const SERVER_URL = 'http://localhost:3000';
-
 let dbInstance = null;
 let playersCache = [];
-let useServer = false;
-
-/* ==================== SERVER SYNC ==================== */
-async function checkServerConnection() {
-  try {
-    const res = await fetch(`${SERVER_URL}/api/registros`, { method: 'GET' });
-    if (res.ok) {
-      useServer = true;
-      console.log('✅ Conectado al servidor');
-      return true;
-    }
-  } catch (e) {
-    console.log('⚠️ Servidor no disponible, usando IndexedDB local');
-  }
-  return false;
-}
-
-async function getPlayersServer() {
-  try {
-    const res = await fetch(`${SERVER_URL}/api/registros`);
-    if (res.ok) return await res.json();
-  } catch (e) {
-    console.error('Error GET servidor:', e);
-  }
-  return [];
-}
-
-async function savePlayerServer(player) {
-  try {
-    const res = await fetch(`${SERVER_URL}/api/registros`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(player)
-    });
-    if (res.ok) {
-      console.log('✅ Inscripción guardada en servidor');
-      return true;
-    }
-  } catch (e) {
-    console.error('Error POST servidor:', e);
-  }
-  return false;
-}
-
-async function importPlayersServer(players) {
-  try {
-    const res = await fetch(`${SERVER_URL}/api/registros/batch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(players)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      console.log(`✅ Importados ${data.added} registros en servidor`);
-      return data;
-    }
-  } catch (e) {
-    console.error('Error batch servidor:', e);
-  }
-  return { added: 0 };
-}
 
 /* ==================== IndexedDB INITIALIZATION ==================== */
 async function initDB() {
@@ -94,11 +31,6 @@ async function initDB() {
 
 /* ==================== STORAGE ==================== */
 async function getPlayersDB() {
-  if (useServer) {
-    const players = await getPlayersServer();
-    playersCache = players;
-    return players;
-  }
   try {
     if (!dbInstance) await initDB();
     return new Promise((resolve, reject) => {
@@ -119,10 +51,6 @@ function getPlayers() {
 }
 
 async function savePlayersDB(list) {
-  if (useServer) {
-    playersCache = list;
-    return; // El servidor gestiona batch import
-  }
   try {
     if (!dbInstance) await initDB();
     playersCache = list;
@@ -145,12 +73,9 @@ function savePlayers(list) {
 }
 
 /* Cargar datos al iniciar */
-checkServerConnection().then(() => {
-  return initDB().then(() => getPlayersDB());
-}).then(players => {
+initDB().then(() => getPlayersDB()).then(players => {
   playersCache = players;
-  const src = useServer ? 'servidor' : 'IndexedDB';
-  console.log(`✅ ${src} cargado con ${players.length} registros`);
+  console.log(`✅ IndexedDB cargado con ${players.length} registros`);
   // Limpiar localStorage antiguo
   try { localStorage.removeItem('torneo_baloncesto_2026'); } catch(e) {}
 }).catch(e => console.error('❌ Error inicializando:', e));
@@ -290,10 +215,7 @@ if (form) {
       const players = getPlayers();
       players.push(player);
       
-      // Guardar en servidor primero, sino en local
-      if (useServer) {
-        await savePlayerServer(player);
-      }
+      // Guardar localmente en IndexedDB
       savePlayers(players);
 
       /* Mostrar modal */
@@ -386,18 +308,13 @@ async function handleImportJSONFile(file) {
       if (!Array.isArray(imported)) throw new Error('JSON inválido');
       
       let added = 0;
-      if (useServer) {
-        const result = await importPlayersServer(imported);
-        added = result.added || 0;
-      } else {
-        const existing = await getPlayersDB();
-        imported.forEach(p => {
-          const exists = existing.some(ep => (ep.documento && ep.documento === p.documento) || (ep.id && ep.id === p.id));
-          if (!exists) { existing.push(p); added++; }
-        });
-        if (added) {
-          savePlayers(existing);
-        }
+      const existing = await getPlayersDB();
+      imported.forEach(p => {
+        const exists = existing.some(ep => (ep.documento && ep.documento === p.documento) || (ep.id && ep.id === p.id));
+        if (!exists) { existing.push(p); added++; }
+      });
+      if (added) {
+        savePlayers(existing);
       }
       
       await renderStats();
@@ -607,3 +524,5 @@ async function downloadExcel() {
   const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   XLSX.writeFile(wb, `Torneo_Baloncesto_Inscripciones_${dateStr}.xlsx`);
 }
+
+/* No server sync functions present; storage is local IndexedDB only */

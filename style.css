@@ -225,7 +225,17 @@ body {
 @media (max-width: 520px) {
   .row-2 { grid-template-columns: 1fr; }
 
-  .side-rail { display: none; }
+  .side-rail {
+    width: 88px;
+    height: 280px;
+    opacity: 0.85;
+  }
+
+  .side-card {
+    width: 88px;
+    height: 64px;
+    border-radius: 12px;
+  }
 
   .hero-logo-center {
     width: 78px;

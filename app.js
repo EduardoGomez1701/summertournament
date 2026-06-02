@@ -5,16 +5,82 @@
 
 const STORAGE_KEY = 'torneo_baloncesto_2026';
 const ADMIN_PASS  = '123'; //
+const DB_NAME = 'TorneoBaloncesto';
+const DB_VERSION = 1;
+const DB_STORE = 'inscripciones';
+
+let dbInstance = null;
+let playersCache = [];
+
+/* ==================== IndexedDB INITIALIZATION ==================== */
+async function initDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      dbInstance = req.result;
+      resolve(dbInstance);
+    };
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) {
+        db.createObjectStore(DB_STORE, { keyPath: 'id' });
+      }
+    };
+  });
+}
 
 /* ==================== STORAGE ==================== */
+async function getPlayersDB() {
+  try {
+    if (!dbInstance) await initDB();
+    return new Promise((resolve, reject) => {
+      const tx = dbInstance.transaction([DB_STORE], 'readonly');
+      const store = tx.objectStore(DB_STORE);
+      const req = store.getAll();
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve(req.result || []);
+    });
+  } catch (err) {
+    console.error('Error getPlayersDB:', err);
+    return [];
+  }
+}
+
 function getPlayers() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-  catch { return []; }
+  return playersCache;
+}
+
+async function savePlayersDB(list) {
+  try {
+    if (!dbInstance) await initDB();
+    playersCache = list;
+    return new Promise((resolve, reject) => {
+      const tx = dbInstance.transaction([DB_STORE], 'readwrite');
+      const store = tx.objectStore(DB_STORE);
+      store.clear();
+      list.forEach(p => store.add(p));
+      tx.onerror = () => reject(tx.error);
+      tx.oncomplete = () => resolve();
+    });
+  } catch (err) {
+    console.error('Error savePlayersDB:', err);
+  }
 }
 
 function savePlayers(list) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  playersCache = list;
+  savePlayersDB(list).catch(e => console.error('Guardado async fallido:', e));
 }
+
+/* Cargar datos al iniciar */
+initDB().then(() => getPlayersDB()).then(players => {
+  playersCache = players;
+  console.log('✅ IndexedDB cargado con', players.length, 'registros');
+  
+  // Limpiar localStorage antiguo
+  try { localStorage.removeItem('torneo_baloncesto_2026'); } catch(e) {}
+}).catch(e => console.error('❌ Error inicializando DB:', e));
 
 /* ==================== FORMULARIO ==================== */
 const form = document.getElementById('registration-form');
@@ -69,99 +135,105 @@ if (form) {
   /* Submit */
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
+    console.log('🔵 Submit iniciado');
 
-    let isValid = true;
+    try {
+      let isValid = true;
 
-    /* Validar campos required */
-    const required = [
-      'nombre','apellido','documento','fecha_nacimiento','genero','celular',
-      'equipo','categoria','consentimiento','certificado_pago',
-      'foto_perfil_derecha','foto_perfil_izquierda','foto_frente'
-    ];
-    required.forEach(id => {
-      const el = document.getElementById(id);
-      if (el && !validateField(el)) isValid = false;
-    });
+      /* Validar campos required */
+      const required = [
+        'nombre','apellido','documento','fecha_nacimiento','genero','celular',
+        'equipo','categoria','consentimiento','certificado_pago',
+        'foto_perfil_derecha','foto_perfil_izquierda','foto_frente'
+      ];
+      required.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && !validateField(el)) isValid = false;
+      });
 
-    /* Validar checkbox */
-    const acepta    = document.getElementById('acepta');
-    const acetaErr  = document.getElementById('acepta-err');
-    if (!acepta.checked) { acetaErr.classList.add('visible'); isValid = false; }
-    else { acetaErr.classList.remove('visible'); }
+      /* Validar checkbox */
+      const acepta    = document.getElementById('acepta');
+      const acetaErr  = document.getElementById('acepta-err');
+      if (!acepta.checked) { acetaErr.classList.add('visible'); isValid = false; }
+      else { acetaErr.classList.remove('visible'); }
 
-    if (!isValid) {
-      form.querySelector('.error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
+      if (!isValid) {
+        form.querySelector('.error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      /* Construir objeto jugador */
+      const now = new Date();
+
+      const consentFile = document.getElementById('consentimiento')?.files[0];
+      const payFile = document.getElementById('certificado_pago')?.files[0];
+      const fotoDerecha = document.getElementById('foto_perfil_derecha')?.files[0];
+      const fotoIzquierda = document.getElementById('foto_perfil_izquierda')?.files[0];
+      const fotoFrente = document.getElementById('foto_frente')?.files[0];
+
+      const [
+        consentimientoData,
+        certificadoPagoData,
+        fotoDerechaData,
+        fotoIzquierdaData,
+        fotoFrenteData
+      ] = await Promise.all([
+        readFileAsDataURL(consentFile),
+        readFileAsDataURL(payFile),
+        readFileAsDataURL(fotoDerecha),
+        readFileAsDataURL(fotoIzquierda),
+        readFileAsDataURL(fotoFrente)
+      ]);
+
+      const player = {
+        id: Date.now(),
+        nombre:        document.getElementById('nombre').value.trim(),
+        apellido:      document.getElementById('apellido').value.trim(),
+        documento:     document.getElementById('documento').value.trim(),
+        fecha_nac:     document.getElementById('fecha_nacimiento').value,
+        edad:          document.getElementById('edad').value,
+        genero:        document.getElementById('genero').value,
+        celular:       document.getElementById('celular').value.trim(),
+        email:         document.getElementById('email').value.trim(),
+        procedencia:   document.getElementById('procedencia').value.trim(),
+        equipo:        document.getElementById('equipo')?.value.trim() || '',
+        categoria:     document.getElementById('categoria')?.value || '',
+        camiseta:      document.getElementById('camiseta')?.value || '',
+        posicion:      document.getElementById('posicion')?.value || '',
+        condiciones:   document.getElementById('condiciones')?.value.trim() || '',
+        consentimiento_pdf_name: consentFile?.name || '',
+        consentimiento_pdf_data: consentimientoData || '',
+        certificado_pago_name: payFile?.name || '',
+        certificado_pago_data: certificadoPagoData || '',
+        foto_perfil_derecha_name: fotoDerecha?.name || '',
+        foto_perfil_derecha_data: fotoDerechaData || '',
+        foto_perfil_izquierda_name: fotoIzquierda?.name || '',
+        foto_perfil_izquierda_data: fotoIzquierdaData || '',
+        foto_frente_name: fotoFrente?.name || '',
+        foto_frente_data: fotoFrenteData || '',
+        fecha_inscripcion: now.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
+      };
+
+      const players = getPlayers();
+      players.push(player);
+      savePlayers(players);
+
+      /* Mostrar modal */
+      document.getElementById('modal-name').textContent =
+        `${player.nombre} ${player.apellido} · ${player.equipo}`;
+      document.getElementById('success-modal').classList.remove('hidden');
+
+      /* Resetear */
+      form.reset();
+      document.getElementById('edad').value = '';
+      document.getElementById('posicion').value = '';
+      document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.err-msg').forEach(e => e.classList.remove('visible'));
+      document.querySelectorAll('.error').forEach(e => e.classList.remove('error'));
+    } catch (err) {
+      console.error('Error en submit:', err);
+      alert('Error al enviar inscripción: ' + err.message);
     }
-
-    /* Construir objeto jugador */
-    const now = new Date();
-
-    const consentFile = document.getElementById('consentimiento')?.files[0];
-    const payFile = document.getElementById('certificado_pago')?.files[0];
-    const fotoDerecha = document.getElementById('foto_perfil_derecha')?.files[0];
-    const fotoIzquierda = document.getElementById('foto_perfil_izquierda')?.files[0];
-    const fotoFrente = document.getElementById('foto_frente')?.files[0];
-
-    const [
-      consentimientoData,
-      certificadoPagoData,
-      fotoDerechaData,
-      fotoIzquierdaData,
-      fotoFrenteData
-    ] = await Promise.all([
-      readFileAsDataURL(consentFile),
-      readFileAsDataURL(payFile),
-      readFileAsDataURL(fotoDerecha),
-      readFileAsDataURL(fotoIzquierda),
-      readFileAsDataURL(fotoFrente)
-    ]);
-
-    const player = {
-      id: Date.now(),
-      nombre:        document.getElementById('nombre').value.trim(),
-      apellido:      document.getElementById('apellido').value.trim(),
-      documento:     document.getElementById('documento').value.trim(),
-      fecha_nac:     document.getElementById('fecha_nacimiento').value,
-      edad:          document.getElementById('edad').value,
-      genero:        document.getElementById('genero').value,
-      celular:       document.getElementById('celular').value.trim(),
-      email:         document.getElementById('email').value.trim(),
-      procedencia:   document.getElementById('procedencia').value.trim(),
-      equipo:        document.getElementById('equipo')?.value.trim() || '',
-      categoria:     document.getElementById('categoria')?.value || '',
-      camiseta:      document.getElementById('camiseta')?.value || '',
-      posicion:      document.getElementById('posicion')?.value || '',
-      condiciones:   document.getElementById('condiciones')?.value.trim() || '',
-      consentimiento_pdf_name: consentFile?.name || '',
-      consentimiento_pdf_data: consentimientoData || '',
-      certificado_pago_name: payFile?.name || '',
-      certificado_pago_data: certificadoPagoData || '',
-      foto_perfil_derecha_name: fotoDerecha?.name || '',
-      foto_perfil_derecha_data: fotoDerechaData || '',
-      foto_perfil_izquierda_name: fotoIzquierda?.name || '',
-      foto_perfil_izquierda_data: fotoIzquierdaData || '',
-      foto_frente_name: fotoFrente?.name || '',
-      foto_frente_data: fotoFrenteData || '',
-      fecha_inscripcion: now.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
-    };
-
-    const players = getPlayers();
-    players.push(player);
-    savePlayers(players);
-
-    /* Mostrar modal */
-    document.getElementById('modal-name').textContent =
-      `${player.nombre} ${player.apellido} · ${player.equipo}`;
-    document.getElementById('success-modal').classList.remove('hidden');
-
-    /* Resetear */
-    form.reset();
-    document.getElementById('edad').value = '';
-    document.getElementById('posicion').value = '';
-    document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.err-msg').forEach(e => e.classList.remove('visible'));
-    document.querySelectorAll('.error').forEach(e => e.classList.remove('error'));
   });
 }
 
@@ -170,7 +242,7 @@ function closeModal() {
 }
 
 /* ==================== ADMIN ==================== */
-function adminLogin() {
+async function adminLogin() {
   const pass  = document.getElementById('admin-pass').value;
   const errEl = document.getElementById('pass-err');
 
@@ -178,8 +250,8 @@ function adminLogin() {
     sessionStorage.setItem('admin_auth', '1');
     document.getElementById('login-page').classList.remove('active');
     document.getElementById('admin-panel').classList.add('active');
-    renderStats();
-    renderTable();
+    await renderStats();
+    await renderTable();
     errEl.classList.remove('visible');
   } else {
     errEl.classList.add('visible');
@@ -196,8 +268,10 @@ if (passField) {
   if (sessionStorage.getItem('admin_auth') === '1') {
     document.getElementById('login-page').classList.remove('active');
     document.getElementById('admin-panel').classList.add('active');
-    renderStats();
-    renderTable();
+    (async () => {
+      await renderStats();
+      await renderTable();
+    })();
   }
 }
 
@@ -209,8 +283,8 @@ function adminLogout() {
 }
 
 /* ===== IMPORT / EXPORT JSON ===== */
-function downloadJSON() {
-  const players = getPlayers();
+async function downloadJSON() {
+  const players = await getPlayersDB();
   const now = new Date();
   const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   const fn = `inscripciones_${dateStr}.json`;
@@ -225,14 +299,14 @@ function downloadJSON() {
   URL.revokeObjectURL(url);
 }
 
-function handleImportJSONFile(file) {
+async function handleImportJSONFile(file) {
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = async function (e) {
     try {
       const imported = JSON.parse(e.target.result);
       if (!Array.isArray(imported)) throw new Error('JSON inválido');
-      const existing = getPlayers();
+      const existing = await getPlayersDB();
       let added = 0;
       imported.forEach(p => {
         const exists = existing.some(ep => (ep.documento && ep.documento === p.documento) || (ep.id && ep.id === p.id));
@@ -240,8 +314,8 @@ function handleImportJSONFile(file) {
       });
       if (added) {
         savePlayers(existing);
-        renderStats();
-        renderTable();
+        await renderStats();
+        await renderTable();
       }
       alert(`Importado: ${imported.length} registros. Añadidos: ${added}.`);
     } catch (err) {
@@ -251,24 +325,25 @@ function handleImportJSONFile(file) {
   reader.readAsText(file);
 }
 
-/* Conectar botón/entrada si existen en la página */
-document.addEventListener('DOMContentLoaded', () => {
-  const importBtn = document.getElementById('import-json-btn');
-  const importInput = document.getElementById('import-json');
-  if (importBtn && importInput) {
-    importBtn.addEventListener('click', () => importInput.click());
-    importInput.addEventListener('change', (e) => {
-      const f = e.target.files && e.target.files[0];
-      if (f) handleImportJSONFile(f);
-      // reset input to allow same file to be selected again
-      importInput.value = '';
-    });
-  }
-});
+/* Conectar botón/entrada SOLO si existen en la página (admin) */
+if (document.getElementById('admin-panel')) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const importBtn = document.getElementById('import-json-btn');
+    const importInput = document.getElementById('import-json');
+    if (importBtn && importInput) {
+      importBtn.addEventListener('click', () => importInput.click());
+      importInput.addEventListener('change', async (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f) await handleImportJSONFile(f);
+        importInput.value = '';
+      });
+    }
+  });
+}
 
 /* ===== STATS ===== */
-function renderStats() {
-  const players  = getPlayers();
+async function renderStats() {
+  const players  = await getPlayersDB();
   const equipos  = [...new Set(players.map(p => p.equipo).filter(Boolean))];
   const catCount = {};
   players.forEach(p => { catCount[p.categoria] = (catCount[p.categoria] || 0) + 1; });
@@ -308,8 +383,8 @@ function makeImagePreview(label, data, name) {
   return `<a class="thumb-link" href="${data}" target="_blank" rel="noreferrer noopener" title="${label} - ${name || ''}"><img class="thumb-img" src="${data}" alt="${label}" /></a>`;
 }
 
-function renderTable() {
-  const players  = getPlayers();
+async function renderTable() {
+  const players  = await getPlayersDB();
   const search   = (document.getElementById('search-input')?.value || '').toLowerCase();
   const filterCat = document.getElementById('filter-cat')?.value || '';
 
@@ -381,14 +456,14 @@ function confirmDelete(id) {
   document.getElementById('confirm-delete-btn').onclick = doDelete;
 }
 
-function doDelete() {
+async function doDelete() {
   if (!pendingDeleteId) return;
-  const players = getPlayers().filter(p => p.id !== pendingDeleteId);
+  const players = (await getPlayersDB()).filter(p => p.id !== pendingDeleteId);
   savePlayers(players);
   pendingDeleteId = null;
   closeDeleteModal();
-  renderStats();
-  renderTable();
+  await renderStats();
+  await renderTable();
 }
 
 function closeDeleteModal() {
@@ -397,8 +472,8 @@ function closeDeleteModal() {
 }
 
 /* ===== EXCEL DOWNLOAD ===== */
-function downloadExcel() {
-  const players = getPlayers();
+async function downloadExcel() {
+  const players = await getPlayersDB();
 
   if (players.length === 0) {
     alert('No hay inscripciones para descargar.');

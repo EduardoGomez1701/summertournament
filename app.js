@@ -1,84 +1,25 @@
 /* =====================================================
    TORNEO VERANEAL DE BALONCESTO · Santander de Quilichao
-   app.js — Formulario + Admin Panel
+   app.js — Google Sheets como base de datos
    ===================================================== */
 
-const STORAGE_KEY = 'torneo_baloncesto_2026';
-const ADMIN_PASS  = '123'; //
-const DB_NAME = 'TorneoBaloncesto';
-const DB_VERSION = 1;
-const DB_STORE = 'inscripciones';
-let dbInstance = null;
-let playersCache = [];
+const ADMIN_PASS = '123';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyeNfAj6_1Oklco9e1Cyd-r4RooBg3mZTUoAaJsEpfrqSX49KWyoYd-6c4mSVlou1wsVA/exec';
 
-/* ==================== IndexedDB INITIALIZATION ==================== */
-async function initDB() {
+/* ==================== UTILIDADES DE ARCHIVOS ==================== */
+function readFileAsBase64(file) {
+  if (!file) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onerror = () => reject(req.error);
-    req.onsuccess = () => {
-      dbInstance = req.result;
-      resolve(dbInstance);
+    const reader = new FileReader();
+    reader.onload = () => {
+      // Quitar el prefijo "data:...;base64," y dejar solo el base64 puro
+      const base64 = reader.result.split(',')[1];
+      resolve({ data: base64, type: file.type, name: file.name });
     };
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(DB_STORE)) {
-        db.createObjectStore(DB_STORE, { keyPath: 'id' });
-      }
-    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
   });
 }
-
-/* ==================== STORAGE ==================== */
-async function getPlayersDB() {
-  try {
-    if (!dbInstance) await initDB();
-    return new Promise((resolve, reject) => {
-      const tx = dbInstance.transaction([DB_STORE], 'readonly');
-      const store = tx.objectStore(DB_STORE);
-      const req = store.getAll();
-      req.onerror = () => reject(req.error);
-      req.onsuccess = () => resolve(req.result || []);
-    });
-  } catch (err) {
-    console.error('Error getPlayersDB:', err);
-    return [];
-  }
-}
-
-function getPlayers() {
-  return playersCache;
-}
-
-async function savePlayersDB(list) {
-  try {
-    if (!dbInstance) await initDB();
-    playersCache = list;
-    return new Promise((resolve, reject) => {
-      const tx = dbInstance.transaction([DB_STORE], 'readwrite');
-      const store = tx.objectStore(DB_STORE);
-      store.clear();
-      list.forEach(p => store.add(p));
-      tx.onerror = () => reject(tx.error);
-      tx.oncomplete = () => resolve();
-    });
-  } catch (err) {
-    console.error('Error savePlayersDB:', err);
-  }
-}
-
-function savePlayers(list) {
-  playersCache = list;
-  savePlayersDB(list).catch(e => console.error('Guardado async fallido:', e));
-}
-
-/* Cargar datos al iniciar */
-initDB().then(() => getPlayersDB()).then(players => {
-  playersCache = players;
-  console.log(`✅ IndexedDB cargado con ${players.length} registros`);
-  // Limpiar localStorage antiguo
-  try { localStorage.removeItem('torneo_baloncesto_2026'); } catch(e) {}
-}).catch(e => console.error('❌ Error inicializando:', e));
 
 /* ==================== FORMULARIO ==================== */
 const form = document.getElementById('registration-form');
@@ -104,19 +45,19 @@ if (form) {
     });
   });
 
-  const camisetaSelect = document.getElementById('camiseta');
+  /* Talla de camiseta "Otra" */
+  const camisetaSelect    = document.getElementById('camiseta');
   const camisetaOtraInput = document.getElementById('camiseta_otra');
-  const camisetaOtraWrap = document.getElementById('camiseta-otra-wrap');
+  const camisetaOtraWrap  = document.getElementById('camiseta-otra-wrap');
 
   function toggleCamisetaOtra() {
     const mostrar = camisetaSelect?.value === 'Otra';
     if (camisetaOtraWrap) camisetaOtraWrap.style.display = mostrar ? 'block' : 'none';
     if (camisetaOtraInput) {
       camisetaOtraInput.required = mostrar;
-      camisetaOtraInput.value = mostrar ? camisetaOtraInput.value.trim() : '';
+      if (!mostrar) camisetaOtraInput.value = '';
     }
   }
-
   camisetaSelect?.addEventListener('change', toggleCamisetaOtra);
   toggleCamisetaOtra();
 
@@ -131,80 +72,70 @@ if (form) {
     return valid;
   }
 
-  function readFileAsDataURL(file) {
-    if (!file) return Promise.resolve('');
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-  }
-
   form.querySelectorAll('input, select, textarea').forEach(el => {
-    el.addEventListener('blur', () => validateField(el));
+    el.addEventListener('blur',  () => validateField(el));
     el.addEventListener('input', () => { if (el.classList.contains('error')) validateField(el); });
   });
 
-  /* Submit */
+  /* ── SUBMIT ── */
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
-    console.log('🔵 Submit iniciado');
+
+    /* Validar campos requeridos */
+    let isValid = true;
+    const required = [
+      'nombre','apellido','documento','fecha_nacimiento','genero','celular',
+      'altura','peso','camiseta',
+      'consentimiento','certificado_pago','certificado_adres',
+      'foto_perfil_derecha','foto_perfil_izquierda','foto_frente'
+    ];
+    required.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !validateField(el)) isValid = false;
+    });
+
+    /* Validar checkbox */
+    const acepta   = document.getElementById('acepta');
+    const acetaErr = document.getElementById('acepta-err');
+    if (!acepta.checked) { acetaErr.classList.add('visible'); isValid = false; }
+    else { acetaErr.classList.remove('visible'); }
+
+    if (!isValid) {
+      form.querySelector('.error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    /* Mostrar estado de carga */
+    const btnSubmit = form.querySelector('.btn-submit');
+    const btnText   = btnSubmit.querySelector('span');
+    btnSubmit.disabled = true;
+    btnText.textContent = 'Enviando...';
 
     try {
-      let isValid = true;
-
-      /* Validar campos required */
-      const required = [
-        'nombre','apellido','documento','fecha_nacimiento','genero','celular',
-        'altura','peso','consentimiento','certificado_pago',
-        'foto_perfil_derecha','foto_perfil_izquierda','foto_frente'
-      ];
-      required.forEach(id => {
-        const el = document.getElementById(id);
-        if (el && !validateField(el)) isValid = false;
-      });
-
-      /* Validar checkbox */
-      const acepta    = document.getElementById('acepta');
-      const acetaErr  = document.getElementById('acepta-err');
-      if (!acepta.checked) { acetaErr.classList.add('visible'); isValid = false; }
-      else { acetaErr.classList.remove('visible'); }
-
-      if (!isValid) {
-        form.querySelector('.error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-      }
-
-      /* Construir objeto jugador */
-      const now = new Date();
-
-      const consentFile = document.getElementById('consentimiento')?.files[0];
-      const payFile = document.getElementById('certificado_pago')?.files[0];
-      const fotoDerecha = document.getElementById('foto_perfil_derecha')?.files[0];
-      const fotoIzquierda = document.getElementById('foto_perfil_izquierda')?.files[0];
-      const fotoFrente = document.getElementById('foto_frente')?.files[0];
-
+      /* Leer archivos en base64 en paralelo */
       const [
-        consentimientoData,
-        certificadoPagoData,
-        fotoDerechaData,
-        fotoIzquierdaData,
-        fotoFrenteData
+        consentimientoFile,
+        certificadoPagoFile,
+        certificadoAdresFile,
+        fotoDerFile,
+        fotoIzqFile,
+        fotoFrenteFile
       ] = await Promise.all([
-        readFileAsDataURL(consentFile),
-        readFileAsDataURL(payFile),
-        readFileAsDataURL(fotoDerecha),
-        readFileAsDataURL(fotoIzquierda),
-        readFileAsDataURL(fotoFrente)
+        readFileAsBase64(document.getElementById('consentimiento')?.files[0]),
+        readFileAsBase64(document.getElementById('certificado_pago')?.files[0]),
+        readFileAsBase64(document.getElementById('certificado_adres')?.files[0]),
+        readFileAsBase64(document.getElementById('foto_perfil_derecha')?.files[0]),
+        readFileAsBase64(document.getElementById('foto_perfil_izquierda')?.files[0]),
+        readFileAsBase64(document.getElementById('foto_frente')?.files[0])
       ]);
 
-      const tallaCamiseta = (camisetaSelect?.value === 'Otra')
+      const tallaCamiseta = camisetaSelect?.value === 'Otra'
         ? (camisetaOtraInput?.value.trim() || '')
         : (camisetaSelect?.value || '');
 
-      const player = {
-        id: Date.now(),
+      const now = new Date();
+      const payload = {
+        id:            Date.now(),
         nombre:        document.getElementById('nombre').value.trim(),
         apellido:      document.getElementById('apellido').value.trim(),
         documento:     document.getElementById('documento').value.trim(),
@@ -216,36 +147,44 @@ if (form) {
         procedencia:   document.getElementById('procedencia').value.trim(),
         altura:        document.getElementById('altura')?.value.trim() || '',
         peso:          document.getElementById('peso')?.value.trim() || '',
-        equipo:        document.getElementById('equipo')?.value.trim() || '',
-        categoria:     document.getElementById('categoria')?.value || '',
         camiseta:      tallaCamiseta,
-        posicion:      document.getElementById('posicion')?.value || '',
-        condiciones:   document.getElementById('condiciones')?.value.trim() || '',
-        consentimiento_pdf_name: consentFile?.name || '',
-        consentimiento_pdf_data: consentimientoData || '',
-        certificado_pago_name: payFile?.name || '',
-        certificado_pago_data: certificadoPagoData || '',
-        foto_perfil_derecha_name: fotoDerecha?.name || '',
-        foto_perfil_derecha_data: fotoDerechaData || '',
-        foto_perfil_izquierda_name: fotoIzquierda?.name || '',
-        foto_perfil_izquierda_data: fotoIzquierdaData || '',
-        foto_frente_name: fotoFrente?.name || '',
-        foto_frente_data: fotoFrenteData || '',
+        posicion:      document.getElementById('posicion').value || '',
+        condiciones:   document.getElementById('condiciones').value.trim() || '',
+        consentimiento:     consentimientoFile,
+        certificado_pago:   certificadoPagoFile,
+        certificado_adres:  certificadoAdresFile,
+        foto_perfil_derecha:   fotoDerFile,
+        foto_perfil_izquierda: fotoIzqFile,
+        foto_frente:           fotoFrenteFile,
         fecha_inscripcion: now.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
       };
 
-      const players = getPlayers();
-      players.push(player);
-      
-      // Guardar localmente en IndexedDB
-      savePlayers(players);
+      /* Enviar a Google Apps Script
+         Usamos no-cors para evitar el bloqueo CORS del navegador.
+         Con no-cors no podemos leer la respuesta, pero el script igual
+         procesa los datos correctamente en el servidor. */
+      console.log('📤 Enviando datos a:', SCRIPT_URL);
+      console.log('📦 Payload (sin archivos):', {
+        nombre: payload.nombre,
+        apellido: payload.apellido,
+        documento: payload.documento,
+        fecha_inscripcion: payload.fecha_inscripcion
+      });
 
-      /* Mostrar modal */
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode:  'no-cors',
+        body:  JSON.stringify(payload)
+      });
+
+      console.log('✅ Fetch completado (no-cors, sin confirmación de respuesta)');
+
+      /* Éxito */
       document.getElementById('modal-name').textContent =
-        `${player.nombre} ${player.apellido} · ${player.equipo}`;
+        `${payload.nombre} ${payload.apellido}`;
       document.getElementById('success-modal').classList.remove('hidden');
 
-      /* Resetear */
+      /* Resetear formulario */
       form.reset();
       document.getElementById('edad').value = '';
       document.getElementById('posicion').value = '';
@@ -253,9 +192,13 @@ if (form) {
       document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.err-msg').forEach(e => e.classList.remove('visible'));
       document.querySelectorAll('.error').forEach(e => e.classList.remove('error'));
+
     } catch (err) {
-      console.error('Error en submit:', err);
-      alert('Error al enviar inscripción: ' + err.message);
+      console.error('Error al enviar:', err);
+      alert('❌ Error al enviar la inscripción.\n\nVerifica tu conexión a internet e intenta de nuevo.\n\nDetalle: ' + err.message);
+    } finally {
+      btnSubmit.disabled = false;
+      btnText.textContent = 'Enviar inscripción';
     }
   });
 }
@@ -265,7 +208,7 @@ function closeModal() {
 }
 
 /* ==================== ADMIN ==================== */
-async function adminLogin() {
+function adminLogin() {
   const pass  = document.getElementById('admin-pass').value;
   const errEl = document.getElementById('pass-err');
 
@@ -273,28 +216,11 @@ async function adminLogin() {
     sessionStorage.setItem('admin_auth', '1');
     document.getElementById('login-page').classList.remove('active');
     document.getElementById('admin-panel').classList.add('active');
-    await renderStats();
-    await renderTable();
     errEl.classList.remove('visible');
+    loadAdminData();
   } else {
     errEl.classList.add('visible');
     document.getElementById('admin-pass').classList.add('error');
-  }
-}
-
-/* Permitir Enter en campo contraseña */
-const passField = document.getElementById('admin-pass');
-if (passField) {
-  passField.addEventListener('keydown', e => { if (e.key === 'Enter') adminLogin(); });
-
-  /* Verificar sesión activa */
-  if (sessionStorage.getItem('admin_auth') === '1') {
-    document.getElementById('login-page').classList.remove('active');
-    document.getElementById('admin-panel').classList.add('active');
-    (async () => {
-      await renderStats();
-      await renderTable();
-    })();
   }
 }
 
@@ -302,77 +228,92 @@ function adminLogout() {
   sessionStorage.removeItem('admin_auth');
   document.getElementById('admin-panel').classList.remove('active');
   document.getElementById('login-page').classList.add('active');
-  if (document.getElementById('admin-pass')) document.getElementById('admin-pass').value = '';
+  const passEl = document.getElementById('admin-pass');
+  if (passEl) passEl.value = '';
 }
 
-/* ===== IMPORT / EXPORT JSON ===== */
-async function downloadJSON() {
-  const players = await getPlayersDB();
-  const now = new Date();
-  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const fn = `inscripciones_${dateStr}.json`;
-  const blob = new Blob([JSON.stringify(players, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fn;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+/* Enter en campo contraseña */
+const passField = document.getElementById('admin-pass');
+if (passField) {
+  passField.addEventListener('keydown', e => { if (e.key === 'Enter') adminLogin(); });
 
-async function handleImportJSONFile(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async function (e) {
-    try {
-      const imported = JSON.parse(e.target.result);
-      if (!Array.isArray(imported)) throw new Error('JSON inválido');
-      
-      let added = 0;
-      const existing = await getPlayersDB();
-      imported.forEach(p => {
-        const exists = existing.some(ep => (ep.documento && ep.documento === p.documento) || (ep.id && ep.id === p.id));
-        if (!exists) { existing.push(p); added++; }
-      });
-      if (added) {
-        savePlayers(existing);
-      }
-      
-      await renderStats();
-      await renderTable();
-      alert(`Importado: ${imported.length} registros. Añadidos: ${added}.`);
-    } catch (err) {
-      alert('Error al importar JSON: ' + err.message);
+  if (sessionStorage.getItem('admin_auth') === '1') {
+    document.getElementById('login-page').classList.remove('active');
+    document.getElementById('admin-panel').classList.add('active');
+    loadAdminData();
+  }}
+
+/* ── Cargar datos desde Google Sheets via JSONP (evita CORS) ── */
+let cachedPlayers = [];
+
+function loadAdminData() {
+  showTableLoading(true);
+
+  // Nombre único para el callback
+  const cbName = 'gsCallback_' + Date.now();
+
+  // Timeout por si el script no responde
+  const timer = setTimeout(function() {
+    cleanup();
+    showTableLoading(false);
+    alert('❌ Tiempo de espera agotado. Verifica tu conexión e intenta de nuevo.');
+  }, 20000);
+
+  function cleanup() {
+    clearTimeout(timer);
+    delete window[cbName];
+    const el = document.getElementById('jsonp-script');
+    if (el) el.remove();
+  }
+
+  // Definir callback global que Apps Script llamará
+  window[cbName] = function(json) {
+    cleanup();
+    showTableLoading(false);
+    if (!json.ok) {
+      alert('❌ Error al obtener datos: ' + (json.error || 'Error desconocido'));
+      return;
     }
+    cachedPlayers = json.data || [];
+    renderStats();
+    renderTable();
   };
-  reader.readAsText(file);
+
+  // Inyectar tag <script> con la URL del Apps Script + callback
+  const script = document.createElement('script');
+  script.id  = 'jsonp-script';
+  script.src = SCRIPT_URL + '?callback=' + cbName;
+  script.onerror = function() {
+    cleanup();
+    showTableLoading(false);
+    alert('❌ No se pudo conectar con el servidor. Verifica tu conexión.');
+  };
+  document.body.appendChild(script);
 }
 
-/* Conectar botón/entrada SOLO si existen en la página (admin) */
-if (document.getElementById('admin-panel')) {
-  document.addEventListener('DOMContentLoaded', () => {
-    const importBtn = document.getElementById('import-json-btn');
-    const importInput = document.getElementById('import-json');
-    if (importBtn && importInput) {
-      importBtn.addEventListener('click', () => importInput.click());
-      importInput.addEventListener('change', async (e) => {
-        const f = e.target.files && e.target.files[0];
-        if (f) await handleImportJSONFile(f);
-        importInput.value = '';
-      });
-    }
-  });
+function showTableLoading(show) {
+  const tbody = document.getElementById('table-body');
+  const noData = document.getElementById('no-data');
+  if (!tbody) return;
+  if (show) {
+    tbody.innerHTML = `<tr><td colspan="18" style="text-align:center; padding:2rem; color:#8896a7;">⏳ Cargando inscripciones...</td></tr>`;
+    if (noData) noData.classList.add('hidden');
+  }
+}
+
+/* ── Botón refrescar ── */
+function refreshData() {
+  loadAdminData();
 }
 
 /* ===== STATS ===== */
-async function renderStats() {
-  const players = await getPlayersDB();
-  const alturaTotal = players.reduce((sum, p) => sum + (Number(p.altura) || 0), 0);
-  const pesoTotal   = players.reduce((sum, p) => sum + (Number(p.peso) || 0), 0);
+function renderStats() {
+  const players    = cachedPlayers;
+  const alturaTotal = players.reduce((s, p) => s + (parseFloat(p['Altura']) || 0), 0);
+  const pesoTotal   = players.reduce((s, p) => s + (parseFloat(p['Peso'])   || 0), 0);
   const avgAltura   = players.length ? (alturaTotal / players.length).toFixed(1) : '—';
-  const avgPeso     = players.length ? (pesoTotal / players.length).toFixed(1) : '—';
+  const avgPeso     = players.length ? (pesoTotal   / players.length).toFixed(1) : '—';
+  const ultima      = players.length ? players[players.length - 1]['Fecha Inscripción'] : '—';
 
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
@@ -384,38 +325,40 @@ async function renderStats() {
     </div>
     <div class="stat-card">
       <div class="stat-label">Altura promedio</div>
-      <div class="stat-value">${avgAltura} cm</div>
+      <div class="stat-value" style="font-size:1.4rem">${avgAltura} cm</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Peso promedio</div>
-      <div class="stat-value">${avgPeso} kg</div>
+      <div class="stat-value" style="font-size:1.4rem">${avgPeso} kg</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Última inscripción</div>
-      <div class="stat-value" style="font-size:0.9rem; margin-top:4px;">${players.length ? players[players.length-1].fecha_inscripcion : '—'}</div>
+      <div class="stat-value" style="font-size:0.85rem; margin-top:4px;">${ultima}</div>
     </div>
   `;
 }
 
 /* ===== TABLE ===== */
-function makeFileLink(label, data) {
-  if (!data) return '—';
-  return `<a class="link-btn" href="${data}" target="_blank" rel="noreferrer noopener">${label}</a>`;
+function makeFileLink(url, label) {
+  if (!url) return '—';
+  return `<a class="link-btn" href="${url}" target="_blank" rel="noreferrer noopener">${label}</a>`;
 }
 
-function makeImagePreview(label, data, name) {
-  if (!data) return '';
-  return `<a class="thumb-link" href="${data}" target="_blank" rel="noreferrer noopener" title="${label} - ${name || ''}"><img class="thumb-img" src="${data}" alt="${label}" /></a>`;
+function makeImageThumb(url, label) {
+  if (!url) return '';
+  return `<a class="thumb-link" href="${url}" target="_blank" rel="noreferrer noopener" title="${label}">
+    <img class="thumb-img" src="${url}" alt="${label}" onerror="this.parentElement.innerHTML='<span style=\'font-size:0.75rem;color:#8896a7\'>${label}</span>'" />
+  </a>`;
 }
 
-async function renderTable() {
-  const players = await getPlayersDB();
+function renderTable() {
   const search = (document.getElementById('search-input')?.value || '').toLowerCase();
 
-  let filtered = players.filter(p => {
-    const matchSearch = !search ||
-      `${p.nombre} ${p.apellido} ${p.altura || ''} ${p.peso || ''}`.toLowerCase().includes(search);
-    return matchSearch;
+  const filtered = cachedPlayers.filter(p => {
+    const nombre   = String(p['Nombre']    || '').toLowerCase();
+    const apellido = String(p['Apellido']  || '').toLowerCase();
+    const doc      = String(p['Documento'] || '').toLowerCase();
+    return !search || `${nombre} ${apellido} ${doc}`.includes(search);
   });
 
   const tbody  = document.getElementById('table-body');
@@ -429,114 +372,121 @@ async function renderTable() {
   }
 
   noData.classList.add('hidden');
+
   tbody.innerHTML = filtered.map((p, i) => {
-    const consentimientoLink = p.consentimiento_pdf_data
-      ? makeFileLink(p.consentimiento_pdf_name || 'Ver consentimiento', p.consentimiento_pdf_data)
-      : '—';
-    const certificadoLink = p.certificado_pago_data
-      ? makeFileLink(p.certificado_pago_name || 'Ver pago', p.certificado_pago_data)
-      : '—';
-    const fotosLinks = [
-      { label: 'Derecha', data: p.foto_perfil_derecha_data, name: p.foto_perfil_derecha_name },
-      { label: 'Izquierda', data: p.foto_perfil_izquierda_data, name: p.foto_perfil_izquierda_name },
-      { label: 'Frente', data: p.foto_frente_data, name: p.foto_frente_name }
-    ]
-      .filter(item => item.data)
-      .map(item => makeImagePreview(item.label, item.data, item.name))
-      .join('') || '—';
+    const fotos = [
+      makeImageThumb(p['Link Foto Derecha'],    'Derecha'),
+      makeImageThumb(p['Link Foto Izquierda'],  'Izquierda'),
+      makeImageThumb(p['Link Foto Frente'],     'Frente')
+    ].filter(Boolean).join('') || '—';
 
     return `
-    <tr>
-      <td>${i + 1}</td>
-      <td><strong>${p.nombre} ${p.apellido}</strong></td>
-      <td>${p.documento || '—'}</td>
-      <td>${p.edad || '—'}</td>
-      <td>${p.genero || '—'}</td>
-      <td>${p.celular || '—'}</td>
-      <td>${p.email || '—'}</td>
-      <td>${p.altura || '—'}</td>
-      <td>${p.peso || '—'}</td>
-      <td>${p.posicion || '—'}</td>
-      <td>${p.camiseta || '—'}</td>
-      <td>${p.procedencia || '—'}</td>
-      <td>${p.condiciones || 'Ninguna'}</td>
-      <td>${consentimientoLink}</td>
-      <td>${certificadoLink}</td>
-      <td class="thumb-cell">${fotosLinks}</td>
-      <td>${p.fecha_inscripcion}</td>
-      <td><button class="btn-del" onclick="confirmDelete(${p.id})">Eliminar</button></td>
-    </tr>
-  `;
+      <tr>
+        <td>${i + 1}</td>
+        <td><strong>${p['Nombre'] || ''} ${p['Apellido'] || ''}</strong></td>
+        <td>${p['Documento'] || '—'}</td>
+        <td>${p['Edad'] || '—'}</td>
+        <td>${p['Género'] || '—'}</td>
+        <td>${p['Celular'] || '—'}</td>
+        <td>${p['Correo'] || '—'}</td>
+        <td>${p['Altura'] || '—'}</td>
+        <td>${p['Peso'] || '—'}</td>
+        <td>${p['Posición'] || '—'}</td>
+        <td>${p['Camiseta'] || '—'}</td>
+        <td>${p['Procedencia'] || '—'}</td>
+        <td>${p['Condiciones Médicas'] || 'Ninguna'}</td>
+        <td>${makeFileLink(p['Link Consentimiento'], 'Ver PDF')}</td>
+        <td>${makeFileLink(p['Link Pago'], 'Ver PDF')}</td>
+        <td>${makeFileLink(p['Link ADRES'], 'Ver PDF')}</td>
+        <td class="thumb-cell">${fotos}</td>
+        <td>${p['Fecha Inscripción'] || '—'}</td>
+        <td><button class="btn-del" onclick="confirmDelete('${p['ID']}', '${p['Nombre']} ${p['Apellido']}')">Eliminar</button></td>
+      </tr>
+    `;
   }).join('');
 }
 
 /* ===== DELETE ===== */
-let pendingDeleteId = null;
+let pendingDeleteId   = null;
+let pendingDeleteName = '';
 
-function confirmDelete(id) {
-  pendingDeleteId = id;
+function confirmDelete(id, name) {
+  pendingDeleteId   = id;
+  pendingDeleteName = name;
   document.getElementById('delete-modal').classList.remove('hidden');
   document.getElementById('confirm-delete-btn').onclick = doDelete;
 }
 
 async function doDelete() {
   if (!pendingDeleteId) return;
-  const players = (await getPlayersDB()).filter(p => p.id !== pendingDeleteId);
-  savePlayers(players);
-  pendingDeleteId = null;
-  closeDeleteModal();
-  await renderStats();
-  await renderTable();
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode:   'no-cors',
+      body:   JSON.stringify({ action: 'delete', id: pendingDeleteId })
+    });
+    closeDeleteModal();
+    // Esperar un momento y recargar para reflejar el cambio
+    setTimeout(() => loadAdminData(), 1500);
+  } catch (err) {
+    alert('❌ Error al eliminar: ' + err.message);
+    closeDeleteModal();
+  }
 }
 
 function closeDeleteModal() {
   document.getElementById('delete-modal').classList.add('hidden');
-  pendingDeleteId = null;
+  pendingDeleteId   = null;
+  pendingDeleteName = '';
 }
 
 /* ===== EXCEL DOWNLOAD ===== */
 async function downloadExcel() {
-  const players = await getPlayersDB();
-
-  if (players.length === 0) {
+  if (cachedPlayers.length === 0) {
     alert('No hay inscripciones para descargar.');
     return;
   }
-
-  /* SheetJS debe estar cargado en admin.html */
   if (typeof XLSX === 'undefined') {
-    alert('Error: librería de Excel no disponible. Verifica tu conexión.');
+    alert('Error: librería de Excel no disponible.');
     return;
   }
 
   const headers = [
-    'N°', 'Nombre', 'Apellido', 'Documento', 'Fecha Nacimiento',
-    'Edad', 'Género', 'Celular', 'Correo', 'Procedencia',
-    'Altura', 'Peso', 'Posición', 'Talla Camiseta',
-    'Condiciones Médicas', 'Consentimiento PDF', 'Certificado Pago',
-    'Foto perfil derecha', 'Foto perfil izquierda', 'Foto frente',
+    'N°','Nombre','Apellido','Documento','Fecha Nacimiento',
+    'Edad','Género','Celular','Correo','Procedencia',
+    'Altura','Peso','Posición','Camiseta','Condiciones Médicas',
+    'Link Consentimiento','Link Pago','Link ADRES',
+    'Link Foto Derecha','Link Foto Izquierda','Link Foto Frente',
     'Fecha Inscripción'
   ];
 
-  const rows = players.map((p, i) => [
-    i + 1, p.nombre, p.apellido, p.documento, p.fecha_nac,
-    p.edad, p.genero, p.celular, p.email, p.procedencia,
-    p.altura || '', p.peso || '', p.posicion, p.camiseta,
-    p.condiciones || 'Ninguna', p.consentimiento_pdf_name || '',
-    p.certificado_pago_name || '', p.foto_perfil_derecha_name || '',
-    p.foto_perfil_izquierda_name || '', p.foto_frente_name || '',
-    p.fecha_inscripcion
+  const rows = cachedPlayers.map((p, i) => [
+    i + 1,
+    p['Nombre']             || '',
+    p['Apellido']           || '',
+    p['Documento']          || '',
+    p['Fecha Nacimiento']   || '',
+    p['Edad']               || '',
+    p['Género']             || '',
+    p['Celular']            || '',
+    p['Correo']             || '',
+    p['Procedencia']        || '',
+    p['Altura']             || '',
+    p['Peso']               || '',
+    p['Posición']           || '',
+    p['Camiseta']           || '',
+    p['Condiciones Médicas']|| '',
+    p['Link Consentimiento']|| '',
+    p['Link Pago']          || '',
+    p['Link ADRES']         || '',
+    p['Link Foto Derecha']  || '',
+    p['Link Foto Izquierda']|| '',
+    p['Link Foto Frente']   || '',
+    p['Fecha Inscripción']  || ''
   ]);
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-
-  /* Anchos de columna */
-  ws['!cols'] = [
-    {wch:5},{wch:16},{wch:16},{wch:14},{wch:16},
-    {wch:6},{wch:12},{wch:14},{wch:26},{wch:22},
-    {wch:20},{wch:22},{wch:12},{wch:10},
-    {wch:28},{wch:18}
-  ];
+  ws['!cols'] = headers.map(() => ({ wch: 22 }));
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Inscripciones');
@@ -546,4 +496,28 @@ async function downloadExcel() {
   XLSX.writeFile(wb, `Torneo_Baloncesto_Inscripciones_${dateStr}.xlsx`);
 }
 
-/* No server sync functions present; storage is local IndexedDB only */
+/* ===== EXPORT JSON ===== */
+function downloadJSON() {
+  if (cachedPlayers.length === 0) { alert('No hay inscripciones.'); return; }
+  const now     = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const blob    = new Blob([JSON.stringify(cachedPlayers, null, 2)], { type: 'application/json' });
+  const url     = URL.createObjectURL(blob);
+  const a       = document.createElement('a');
+  a.href        = url;
+  a.download    = `inscripciones_${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ===== REGLAMENTO TOGGLE ===== */
+function toggleReglamento() {
+  const viewer = document.getElementById('reglamento-viewer');
+  const arrow  = document.getElementById('reglamento-arrow');
+  if (!viewer) return;
+  const isHidden = viewer.classList.contains('hidden');
+  viewer.classList.toggle('hidden', !isHidden);
+  if (arrow) arrow.classList.toggle('open', isHidden);
+}

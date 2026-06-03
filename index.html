@@ -361,6 +361,21 @@
               <span class="err-msg">Debes cargar el certificado de pago</span>
             </div>
 
+            <div class="field">
+              <label for="certificado_adres">
+                Certificado ADRES / EPS <span class="req">*</span>
+              </label>
+              <p class="field-hint">Certificado de afiliación a salud (ADRES o EPS vigente)</p>
+              <input
+                type="file"
+                id="certificado_adres"
+                name="certificado_adres"
+                accept="application/pdf"
+                required
+              />
+              <span class="err-msg">Debes cargar el certificado ADRES o EPS</span>
+            </div>
+
             <div class="section-title">
               <span class="section-icon">📸</span> Fotos del jugador
             </div>
@@ -423,6 +438,25 @@
               <span class="err-msg" id="acepta-err"
                 >Debes aceptar el reglamento</span
               >
+            </div>
+
+            <!-- Visor de reglamento -->
+            <div class="reglamento-box">
+              <button type="button" class="reglamento-toggle" id="reglamento-toggle" onclick="toggleReglamento()">
+                <span class="reglamento-toggle-icon">📄</span>
+                <span>Ver reglamento del torneo</span>
+                <span class="reglamento-arrow" id="reglamento-arrow">▼</span>
+              </button>
+              <div class="reglamento-viewer hidden" id="reglamento-viewer">
+                <iframe
+                  src="Doc/Reglamento.pdf"
+                  class="reglamento-iframe"
+                  title="Reglamento del Torneo"
+                ></iframe>
+                <a href="Doc/Reglamento.pdf" target="_blank" download="Reglamento_Torneo.pdf" class="download-link reglamento-download">
+                  ⬇ Descargar reglamento en PDF
+                </a>
+              </div>
             </div>
 
             <button type="submit" class="btn-submit">

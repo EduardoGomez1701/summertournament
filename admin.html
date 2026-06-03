@@ -41,19 +41,10 @@
           <h2 class="admin-title">Inscripciones · Torneo Veraneal 2026</h2>
         </div>
         <div class="admin-actions">
-          <button class="btn-download" onclick="downloadExcel()">
-            ⬇ Descargar Excel
-          </button>
-          <button class="btn-download" onclick="downloadJSON()">
-            ⬇ Descargar JSON
-          </button>
-          <input type="file" id="import-json" accept="application/json" style="display:none" />
-          <button class="btn-download" id="import-json-btn">
-            ⬆ Importar JSON
-          </button>
-          <button class="btn-logout" onclick="adminLogout()">
-            Cerrar sesión
-          </button>
+          <button class="btn-refresh" onclick="refreshData()">🔄 Actualizar</button>
+          <button class="btn-download" onclick="downloadExcel()">⬇ Descargar Excel</button>
+          <button class="btn-download" onclick="downloadJSON()">⬇ Descargar JSON</button>
+          <button class="btn-logout" onclick="adminLogout()">Cerrar sesión</button>
         </div>
       </div>
 
@@ -87,6 +78,7 @@
                 <th>Condiciones médicas</th>
                 <th>Consentimiento</th>
                 <th>Pago</th>
+                <th>ADRES/EPS</th>
                 <th>Fotos</th>
                 <th>Fecha inscripción</th>
                 <th></th>

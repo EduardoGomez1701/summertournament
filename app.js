@@ -4,7 +4,7 @@
    ===================================================== */
 
 const ADMIN_PASS = 'Street'; // Cambia esta contraseña antes de publicar
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwThTAOx0ZTpoiB2Y70Exd4EGA2mwI_aUl6zxq88fpB3FOL-5N2-jSZ66XkJCb80L3jVg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzCKiVgtHkP5XIfeDttUTWJGYAYqRfbnsESqrL7SqqJmlE0-pOTB9PIDNaqucMw6JY0rA/exec';
 
 /* ==================== UTILIDADES DE ARCHIVOS ==================== */
 function readFileAsBase64(file) {
@@ -108,7 +108,7 @@ if (form) {
       'nombre', 'apellido', 'documento', 'fecha_nacimiento', 'genero', 'celular',
       'altura', 'peso', 'camiseta',
       'consentimiento', 'certificado_pago', 'certificado_adres', 'Documento_identidad',
-      'foto_perfil_derecha', 'foto_perfil_izquierda', 'foto_frente'
+      'foto_perfil_derecha', 'foto_perfil_izquierda', 'foto_frente','foto_cuerpo_completo'
     ];
     required.forEach(id => {
       const el = document.getElementById(id);
@@ -142,6 +142,7 @@ if (form) {
         fotoDerFile,
         fotoIzqFile,
         fotoFrenteFile,
+        fotoCuerpoCompletoFile
       ] = await Promise.all([
         readFileAsBase64(document.getElementById('consentimiento')?.files[0]),
         readFileAsBase64(document.getElementById('certificado_pago')?.files[0]),
@@ -150,6 +151,7 @@ if (form) {
         readFileAsBase64(document.getElementById('foto_perfil_derecha')?.files[0]),
         readFileAsBase64(document.getElementById('foto_perfil_izquierda')?.files[0]),
         readFileAsBase64(document.getElementById('foto_frente')?.files[0]),
+        readFileAsBase64(document.getElementById('foto_cuerpo_completo')?.files[0])
       ]);
 
       const tallaCamiseta = camisetaSelect?.value === 'Otra'
@@ -181,6 +183,7 @@ if (form) {
         foto_perfil_derecha: fotoDerFile,
         foto_perfil_izquierda: fotoIzqFile,
         foto_frente: fotoFrenteFile,
+        foto_cuerpo_completo: fotoCuerpoCompletoFile,
         fecha_inscripcion: now.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
       };
 
@@ -393,7 +396,8 @@ function renderTable() {
     const fotos = [
       makeImageThumb(p['Link Foto Derecha'], 'Derecha'),
       makeImageThumb(p['Link Foto Izquierda'], 'Izquierda'),
-      makeImageThumb(p['Link Foto Frente'], 'Frente')
+      makeImageThumb(p['Link Foto Frente'], 'Frente'),
+      makeImageThumb(p['Link Foto Cuerpo Completo'], 'Cuerpo Completo')
     ].filter(Boolean).join('') || '—';
 
     return `
@@ -470,7 +474,7 @@ async function downloadExcel() {
     'N°', 'Nombre', 'Apellido', 'Documento', 'Edad', 'Género', 'Celular', 'Correo',
     'Altura', 'Peso', 'Posición', 'Camiseta', 'Procedencia', 'Condiciones Médicas',
     'Link Consentimiento', 'Link Pago', 'Link ADRES', 'Link DocumentoIdentidad',
-    'Link Foto Derecha', 'Link Foto Izquierda', 'Link Foto Frente',
+    'Link Foto Derecha', 'Link Foto Izquierda', 'Link Foto Frente', 'Link Foto Cuerpo Completo',
     'Fecha Inscripción'
   ];
 
@@ -496,6 +500,7 @@ async function downloadExcel() {
     p['Link Foto Derecha'] || '',
     p['Link Foto Izquierda'] || '',
     p['Link Foto Frente'] || '',
+    p['Link Foto Cuerpo Completo'] || '',
     p['Fecha Inscripción'] || ''
   ]);
 

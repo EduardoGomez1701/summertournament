@@ -4,7 +4,7 @@
    ===================================================== */
 
 const ADMIN_PASS = 'Street'; // Cambia esta contraseña antes de publicar
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbdgxSDG-8N3gW3movWBHZKoQU3JREoSf_7-2q31yAuNggOTIwB-v7PO4C5L2nNZE2oQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwThTAOx0ZTpoiB2Y70Exd4EGA2mwI_aUl6zxq88fpB3FOL-5N2-jSZ66XkJCb80L3jVg/exec';
 
 /* ==================== UTILIDADES DE ARCHIVOS ==================== */
 function readFileAsBase64(file) {
@@ -24,7 +24,7 @@ function readFileAsBase64(file) {
 const form = document.getElementById('registration-form');
 if (form) {
 
-  /* Calcular edad automáticamente */
+  /* Calcular edad automáticamente y validar máximo 70 años */
   document.getElementById('fecha_nacimiento').addEventListener('change', function () {
     const dob = new Date(this.value);
     if (isNaN(dob)) return;
@@ -32,7 +32,29 @@ if (form) {
     let age = today.getFullYear() - dob.getFullYear();
     const m = today.getMonth() - dob.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-    document.getElementById('edad').value = age >= 0 ? age : '';
+
+    const edadInput = document.getElementById('edad');
+    const edadErr = document.getElementById('edad-err');
+
+    if (age < 0) {
+      edadInput.value = '';
+      return;
+    }
+
+    edadInput.value = age;
+
+    if (age > 70) {
+      this.value = '';
+      edadInput.value = '';
+      if (edadErr) {
+        edadErr.textContent = 'La edad máxima permitida es 70 años.';
+        edadErr.classList.add('visible');
+      }
+      this.classList.add('error');
+    } else {
+      if (edadErr) edadErr.classList.remove('visible');
+      this.classList.remove('error');
+    }
   });
 
   /* Selección de posición */
@@ -45,9 +67,9 @@ if (form) {
   });
 
   /* Talla de camiseta "Otra" */
-  const camisetaSelect    = document.getElementById('camiseta');
+  const camisetaSelect = document.getElementById('camiseta');
   const camisetaOtraInput = document.getElementById('camiseta_otra');
-  const camisetaOtraWrap  = document.getElementById('camiseta-otra-wrap');
+  const camisetaOtraWrap = document.getElementById('camiseta-otra-wrap');
 
   function toggleCamisetaOtra() {
     const mostrar = camisetaSelect?.value === 'Otra';
@@ -64,7 +86,7 @@ if (form) {
   function validateField(input) {
     if (!input) return true;
     const field = input.closest('.field');
-    const err   = field ? field.querySelector('.err-msg') : null;
+    const err = field ? field.querySelector('.err-msg') : null;
     const valid = input.checkValidity();
     input.classList.toggle('error', !valid);
     if (err) err.classList.toggle('visible', !valid);
@@ -72,7 +94,7 @@ if (form) {
   }
 
   form.querySelectorAll('input, select, textarea').forEach(el => {
-    el.addEventListener('blur',  () => validateField(el));
+    el.addEventListener('blur', () => validateField(el));
     el.addEventListener('input', () => { if (el.classList.contains('error')) validateField(el); });
   });
 
@@ -83,10 +105,10 @@ if (form) {
     /* Validar campos requeridos */
     let isValid = true;
     const required = [
-      'nombre','apellido','documento','fecha_nacimiento','genero','celular',
-      'altura','peso','camiseta',
-      'consentimiento','certificado_pago','certificado_adres',
-      'foto_perfil_derecha','foto_perfil_izquierda','foto_frente'
+      'nombre', 'apellido', 'documento', 'fecha_nacimiento', 'genero', 'celular',
+      'altura', 'peso', 'camiseta',
+      'consentimiento', 'certificado_pago', 'certificado_adres', 'Documento_identidad',
+      'foto_perfil_derecha', 'foto_perfil_izquierda', 'foto_frente'
     ];
     required.forEach(id => {
       const el = document.getElementById(id);
@@ -94,7 +116,7 @@ if (form) {
     });
 
     /* Validar checkbox */
-    const acepta   = document.getElementById('acepta');
+    const acepta = document.getElementById('acepta');
     const acetaErr = document.getElementById('acepta-err');
     if (!acepta.checked) { acetaErr.classList.add('visible'); isValid = false; }
     else { acetaErr.classList.remove('visible'); }
@@ -106,7 +128,7 @@ if (form) {
 
     /* Mostrar estado de carga */
     const btnSubmit = form.querySelector('.btn-submit');
-    const btnText   = btnSubmit.querySelector('span');
+    const btnText = btnSubmit.querySelector('span');
     btnSubmit.disabled = true;
     btnText.textContent = 'Enviando...';
 
@@ -116,16 +138,18 @@ if (form) {
         consentimientoFile,
         certificadoPagoFile,
         certificadoAdresFile,
+        DocumentoIdentidadFile,
         fotoDerFile,
         fotoIzqFile,
-        fotoFrenteFile
+        fotoFrenteFile,
       ] = await Promise.all([
         readFileAsBase64(document.getElementById('consentimiento')?.files[0]),
         readFileAsBase64(document.getElementById('certificado_pago')?.files[0]),
         readFileAsBase64(document.getElementById('certificado_adres')?.files[0]),
+        readFileAsBase64(document.getElementById('Documento_identidad')?.files[0]),
         readFileAsBase64(document.getElementById('foto_perfil_derecha')?.files[0]),
         readFileAsBase64(document.getElementById('foto_perfil_izquierda')?.files[0]),
-        readFileAsBase64(document.getElementById('foto_frente')?.files[0])
+        readFileAsBase64(document.getElementById('foto_frente')?.files[0]),
       ]);
 
       const tallaCamiseta = camisetaSelect?.value === 'Otra'
@@ -134,28 +158,29 @@ if (form) {
 
       const now = new Date();
       const payload = {
-        action:        'insert',
-        id:            Date.now(),
-        nombre:        document.getElementById('nombre').value.trim(),
-        apellido:      document.getElementById('apellido').value.trim(),
-        documento:     document.getElementById('documento').value.trim(),
-        fecha_nac:     document.getElementById('fecha_nacimiento').value,
-        edad:          document.getElementById('edad').value,
-        genero:        document.getElementById('genero').value,
-        celular:       document.getElementById('celular').value.trim(),
-        email:         document.getElementById('email').value.trim(),
-        procedencia:   document.getElementById('procedencia').value.trim(),
-        altura:        document.getElementById('altura')?.value.trim() || '',
-        peso:          document.getElementById('peso')?.value.trim() || '',
-        posicion:      document.getElementById('posicion').value || 'Cualquiera',
-        camiseta:      tallaCamiseta,
-        condiciones:   document.getElementById('condiciones').value.trim() || 'Ninguna',
-        consentimiento:     consentimientoFile,
-        certificado_pago:   certificadoPagoFile,
-        certificado_adres:  certificadoAdresFile,
-        foto_perfil_derecha:   fotoDerFile,
+        action: 'insert',
+        id: Date.now(),
+        nombre: document.getElementById('nombre').value.trim(),
+        apellido: document.getElementById('apellido').value.trim(),
+        documento: document.getElementById('documento').value.trim(),
+        fecha_nac: document.getElementById('fecha_nacimiento').value,
+        edad: document.getElementById('edad').value,
+        genero: document.getElementById('genero').value,
+        celular: document.getElementById('celular').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        procedencia: document.getElementById('procedencia').value.trim(),
+        altura: document.getElementById('altura')?.value.trim() || '',
+        peso: document.getElementById('peso')?.value.trim() || '',
+        posicion: document.getElementById('posicion').value || 'Cualquiera',
+        camiseta: tallaCamiseta,
+        condiciones: document.getElementById('condiciones').value.trim() || 'Ninguna',
+        consentimiento: consentimientoFile,
+        certificado_pago: certificadoPagoFile,
+        certificado_adres: certificadoAdresFile,
+        Documento_identidad: DocumentoIdentidadFile,
+        foto_perfil_derecha: fotoDerFile,
         foto_perfil_izquierda: fotoIzqFile,
-        foto_frente:           fotoFrenteFile,
+        foto_frente: fotoFrenteFile,
         fecha_inscripcion: now.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
       };
 
@@ -165,9 +190,9 @@ if (form) {
       const res = await fetch(SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body:  JSON.stringify(payload)
+        body: JSON.stringify(payload)
       });
-      
+
       const resText = await res.text();
       console.log('✅ Servidor respondió:', resText);
 
@@ -200,7 +225,7 @@ function closeModal() {
 
 /* ==================== ADMIN ==================== */
 function adminLogin() {
-  const pass  = document.getElementById('admin-pass').value;
+  const pass = document.getElementById('admin-pass').value;
   const errEl = document.getElementById('pass-err');
 
   if (pass === ADMIN_PASS) {
@@ -247,7 +272,7 @@ function loadAdminData() {
   showTableLoading(true);
   const cbName = 'gsCallback_' + Date.now();
 
-  const timer = setTimeout(function() {
+  const timer = setTimeout(function () {
     cleanup();
     showTableLoading(false);
     alert('❌ Tiempo de espera agotado. Verifica tu conexión e intenta de nuevo.');
@@ -260,7 +285,7 @@ function loadAdminData() {
     if (el) el.remove();
   }
 
-  window[cbName] = function(json) {
+  window[cbName] = function (json) {
     cleanup();
     showTableLoading(false);
     if (!json.ok) {
@@ -273,9 +298,9 @@ function loadAdminData() {
   };
 
   const script = document.createElement('script');
-  script.id  = 'jsonp-script';
+  script.id = 'jsonp-script';
   script.src = SCRIPT_URL + '?callback=' + cbName;
-  script.onerror = function() {
+  script.onerror = function () {
     cleanup();
     showTableLoading(false);
     alert('❌ No se pudo conectar con el servidor. Verifica tu conexión.');
@@ -299,12 +324,12 @@ function refreshData() {
 
 /* ===== STATS ===== */
 function renderStats() {
-  const players    = cachedPlayers;
+  const players = cachedPlayers;
   const alturaTotal = players.reduce((s, p) => s + (parseFloat(p['Altura']) || 0), 0);
-  const pesoTotal   = players.reduce((s, p) => s + (parseFloat(p['Peso'])   || 0), 0);
-  const avgAltura   = players.length ? (alturaTotal / players.length).toFixed(1) : '—';
-  const avgPeso     = players.length ? (pesoTotal   / players.length).toFixed(1) : '—';
-  const ultima      = players.length ? (players[players.length - 1]['Fecha Inscripción'] || '—') : '—';
+  const pesoTotal = players.reduce((s, p) => s + (parseFloat(p['Peso']) || 0), 0);
+  const avgAltura = players.length ? (alturaTotal / players.length).toFixed(1) : '—';
+  const avgPeso = players.length ? (pesoTotal / players.length).toFixed(1) : '—';
+  const ultima = players.length ? (players[players.length - 1]['Fecha Inscripción'] || '—') : '—';
 
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
@@ -346,13 +371,13 @@ function renderTable() {
   const search = (document.getElementById('search-input')?.value || '').toLowerCase();
 
   const filtered = cachedPlayers.filter(p => {
-    const nombre   = String(p['Nombre']    || '').toLowerCase();
-    const apellido = String(p['Apellido']  || '').toLowerCase();
-    const doc      = String(p['Documento'] || '').toLowerCase();
+    const nombre = String(p['Nombre'] || '').toLowerCase();
+    const apellido = String(p['Apellido'] || '').toLowerCase();
+    const doc = String(p['Documento'] || '').toLowerCase();
     return !search || `${nombre} ${apellido} ${doc}`.includes(search);
   });
 
-  const tbody  = document.getElementById('table-body');
+  const tbody = document.getElementById('table-body');
   const noData = document.getElementById('no-data');
   if (!tbody) return;
 
@@ -366,9 +391,9 @@ function renderTable() {
 
   tbody.innerHTML = filtered.map((p, i) => {
     const fotos = [
-      makeImageThumb(p['Link Foto Derecha'],    'Derecha'),
-      makeImageThumb(p['Link Foto Izquierda'],  'Izquierda'),
-      makeImageThumb(p['Link Foto Frente'],     'Frente')
+      makeImageThumb(p['Link Foto Derecha'], 'Derecha'),
+      makeImageThumb(p['Link Foto Izquierda'], 'Izquierda'),
+      makeImageThumb(p['Link Foto Frente'], 'Frente')
     ].filter(Boolean).join('') || '—';
 
     return `
@@ -389,6 +414,7 @@ function renderTable() {
         <td>${makeFileLink(p['Link Consentimiento'], 'Ver PDF')}</td>
         <td>${makeFileLink(p['Link Pago'], 'Ver PDF')}</td>
         <td>${makeFileLink(p['Link ADRES'], 'Ver PDF')}</td>
+        <td>${makeFileLink(p['Link DocumentoIdentidad'], 'Ver PDF')}</td>
         <td class="thumb-cell">${fotos}</td>
         <td>${p['Fecha Inscripción'] || '—'}</td>
         <td><button class="btn-del" onclick="confirmDelete('${p['ID']}', '${p['Nombre']} ${p['Apellido']}')">Eliminar</button></td>
@@ -398,11 +424,11 @@ function renderTable() {
 }
 
 /* ===== DELETE ===== */
-let pendingDeleteId   = null;
+let pendingDeleteId = null;
 let pendingDeleteName = '';
 
 function confirmDelete(id, name) {
-  pendingDeleteId   = id;
+  pendingDeleteId = id;
   pendingDeleteName = name;
   document.getElementById('delete-modal').classList.remove('hidden');
   document.getElementById('confirm-delete-btn').onclick = doDelete;
@@ -413,7 +439,7 @@ async function doDelete() {
   try {
     await fetch(SCRIPT_URL, {
       method: 'POST',
-      body:   JSON.stringify({ action: 'delete', id: pendingDeleteId })
+      body: JSON.stringify({ action: 'delete', id: pendingDeleteId })
     });
     closeDeleteModal();
     setTimeout(() => loadAdminData(), 1500);
@@ -425,7 +451,7 @@ async function doDelete() {
 
 function closeDeleteModal() {
   document.getElementById('delete-modal').classList.add('hidden');
-  pendingDeleteId   = null;
+  pendingDeleteId = null;
   pendingDeleteName = '';
 }
 
@@ -441,35 +467,36 @@ async function downloadExcel() {
   }
 
   const headers = [
-    'N°','Nombre','Apellido','Documento','Edad','Género','Celular','Correo',
-    'Altura','Peso','Posición','Camiseta','Procedencia','Condiciones Médicas',
-    'Link Consentimiento','Link Pago','Link ADRES',
-    'Link Foto Derecha','Link Foto Izquierda','Link Foto Frente',
+    'N°', 'Nombre', 'Apellido', 'Documento', 'Edad', 'Género', 'Celular', 'Correo',
+    'Altura', 'Peso', 'Posición', 'Camiseta', 'Procedencia', 'Condiciones Médicas',
+    'Link Consentimiento', 'Link Pago', 'Link ADRES', 'Link DocumentoIdentidad',
+    'Link Foto Derecha', 'Link Foto Izquierda', 'Link Foto Frente',
     'Fecha Inscripción'
   ];
 
   const rows = cachedPlayers.map((p, i) => [
     i + 1,
-    p['Nombre']             || '',
-    p['Apellido']           || '',
-    p['Documento']          || '',
-    p['Edad']               || '',
-    p['Género']             || '',
-    p['Celular']            || '',
-    p['Correo']             || '',
-    p['Altura']             || '',
-    p['Peso']               || '',
-    p['Posición']           || '',
-    p['Camiseta']           || '',
-    p['Procedencia']        || '',
-    p['Condiciones Médicas']|| '',
-    p['Link Consentimiento']|| '',
-    p['Link Pago']          || '',
-    p['Link ADRES']         || '',
-    p['Link Foto Derecha']  || '',
-    p['Link Foto Izquierda']|| '',
-    p['Link Foto Frente']   || '',
-    p['Fecha Inscripción']  || ''
+    p['Nombre'] || '',
+    p['Apellido'] || '',
+    p['Documento'] || '',
+    p['Edad'] || '',
+    p['Género'] || '',
+    p['Celular'] || '',
+    p['Correo'] || '',
+    p['Altura'] || '',
+    p['Peso'] || '',
+    p['Posición'] || '',
+    p['Camiseta'] || '',
+    p['Procedencia'] || '',
+    p['Condiciones Médicas'] || '',
+    p['Link Consentimiento'] || '',
+    p['Link Pago'] || '',
+    p['Link ADRES'] || '',
+    p['Link DocumentoIdentidad'] || '',
+    p['Link Foto Derecha'] || '',
+    p['Link Foto Izquierda'] || '',
+    p['Link Foto Frente'] || '',
+    p['Fecha Inscripción'] || ''
   ]);
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
@@ -479,20 +506,20 @@ async function downloadExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Inscripciones');
 
   const now = new Date();
-  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   XLSX.writeFile(wb, `Torneo_Baloncesto_Inscripciones_${dateStr}.xlsx`);
 }
 
 /* ===== EXPORT JSON ===== */
 function downloadJSON() {
   if (cachedPlayers.length === 0) { alert('No hay inscripciones.'); return; }
-  const now     = new Date();
-  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const blob    = new Blob([JSON.stringify(cachedPlayers, null, 2)], { type: 'application/json' });
-  const url     = URL.createObjectURL(blob);
-  const a       = document.createElement('a');
-  a.href        = url;
-  a.download    = `inscripciones_${dateStr}.json`;
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const blob = new Blob([JSON.stringify(cachedPlayers, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `inscripciones_${dateStr}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -502,7 +529,7 @@ function downloadJSON() {
 /* ===== REGLAMENTO TOGGLE ===== */
 function toggleReglamento() {
   const viewer = document.getElementById('reglamento-viewer');
-  const arrow  = document.getElementById('reglamento-arrow');
+  const arrow = document.getElementById('reglamento-arrow');
   if (!viewer) return;
   const isHidden = viewer.classList.contains('hidden');
   viewer.classList.toggle('hidden', !isHidden);

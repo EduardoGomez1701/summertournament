@@ -3,7 +3,7 @@
    app.js — Google Sheets como base de datos
    ===================================================== */
 
-const ADMIN_PASS = '123';
+const ADMIN_PASS = 'Street'; // Cambia esta contraseña antes de publicar
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbdgxSDG-8N3gW3movWBHZKoQU3JREoSf_7-2q31yAuNggOTIwB-v7PO4C5L2nNZE2oQ/exec';
 
 /* ==================== UTILIDADES DE ARCHIVOS ==================== */

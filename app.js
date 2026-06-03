@@ -1,10 +1,10 @@
-/* =====================================================
+/* ================= ====================
    TORNEO VERANEAL DE BALONCESTO · Santander de Quilichao
    app.js — Google Sheets como base de datos
    ===================================================== */
 
 const ADMIN_PASS = '123';
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyeNfAj6_1Oklco9e1Cyd-r4RooBg3mZTUoAaJsEpfrqSX49KWyoYd-6c4mSVlou1wsVA/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbdgxSDG-8N3gW3movWBHZKoQU3JREoSf_7-2q31yAuNggOTIwB-v7PO4C5L2nNZE2oQ/exec';
 
 /* ==================== UTILIDADES DE ARCHIVOS ==================== */
 function readFileAsBase64(file) {
@@ -12,7 +12,6 @@ function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
-      // Quitar el prefijo "data:...;base64," y dejar solo el base64 puro
       const base64 = reader.result.split(',')[1];
       resolve({ data: base64, type: file.type, name: file.name });
     };
@@ -135,6 +134,7 @@ if (form) {
 
       const now = new Date();
       const payload = {
+        action:        'insert',
         id:            Date.now(),
         nombre:        document.getElementById('nombre').value.trim(),
         apellido:      document.getElementById('apellido').value.trim(),
@@ -147,9 +147,9 @@ if (form) {
         procedencia:   document.getElementById('procedencia').value.trim(),
         altura:        document.getElementById('altura')?.value.trim() || '',
         peso:          document.getElementById('peso')?.value.trim() || '',
+        posicion:      document.getElementById('posicion').value || 'Cualquiera',
         camiseta:      tallaCamiseta,
-        posicion:      document.getElementById('posicion').value || '',
-        condiciones:   document.getElementById('condiciones').value.trim() || '',
+        condiciones:   document.getElementById('condiciones').value.trim() || 'Ninguna',
         consentimiento:     consentimientoFile,
         certificado_pago:   certificadoPagoFile,
         certificado_adres:  certificadoAdresFile,
@@ -159,29 +159,20 @@ if (form) {
         fecha_inscripcion: now.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
       };
 
-      /* Enviar a Google Apps Script
-         Usamos no-cors para evitar el bloqueo CORS del navegador.
-         Con no-cors no podemos leer la respuesta, pero el script igual
-         procesa los datos correctamente en el servidor. */
       console.log('📤 Enviando datos a:', SCRIPT_URL);
-      console.log('📦 Payload (sin archivos):', {
-        nombre: payload.nombre,
-        apellido: payload.apellido,
-        documento: payload.documento,
-        fecha_inscripcion: payload.fecha_inscripcion
-      });
 
-      await fetch(SCRIPT_URL, {
+      // Eliminado mode: 'no-cors' para capturar errores reales del Sheet
+      const res = await fetch(SCRIPT_URL, {
         method: 'POST',
-        mode:  'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body:  JSON.stringify(payload)
       });
-
-      console.log('✅ Fetch completado (no-cors, sin confirmación de respuesta)');
+      
+      const resText = await res.text();
+      console.log('✅ Servidor respondió:', resText);
 
       /* Éxito */
-      document.getElementById('modal-name').textContent =
-        `${payload.nombre} ${payload.apellido}`;
+      document.getElementById('modal-name').textContent = `${payload.nombre} ${payload.apellido}`;
       document.getElementById('success-modal').classList.remove('hidden');
 
       /* Resetear formulario */
@@ -195,7 +186,7 @@ if (form) {
 
     } catch (err) {
       console.error('Error al enviar:', err);
-      alert('❌ Error al enviar la inscripción.\n\nVerifica tu conexión a internet e intenta de nuevo.\n\nDetalle: ' + err.message);
+      alert('❌ Error al enviar la inscripción.\n\nVerifica tu conexión e intenta de nuevo.\n\nDetalle: ' + err.message);
     } finally {
       btnSubmit.disabled = false;
       btnText.textContent = 'Enviar inscripción';
@@ -236,23 +227,26 @@ function adminLogout() {
 const passField = document.getElementById('admin-pass');
 if (passField) {
   passField.addEventListener('keydown', e => { if (e.key === 'Enter') adminLogin(); });
+}
 
-  if (sessionStorage.getItem('admin_auth') === '1') {
-    document.getElementById('login-page').classList.remove('active');
-    document.getElementById('admin-panel').classList.add('active');
+// Validación segura de sesión para no romper index.html
+if (sessionStorage.getItem('admin_auth') === '1') {
+  const lp = document.getElementById('login-page');
+  const ap = document.getElementById('admin-panel');
+  if (lp && ap) {
+    lp.classList.remove('active');
+    ap.classList.add('active');
     loadAdminData();
-  }}
+  }
+}
 
-/* ── Cargar datos desde Google Sheets via JSONP (evita CORS) ── */
+/* ── Cargar datos desde Google Sheets via JSONP ── */
 let cachedPlayers = [];
 
 function loadAdminData() {
   showTableLoading(true);
-
-  // Nombre único para el callback
   const cbName = 'gsCallback_' + Date.now();
 
-  // Timeout por si el script no responde
   const timer = setTimeout(function() {
     cleanup();
     showTableLoading(false);
@@ -266,7 +260,6 @@ function loadAdminData() {
     if (el) el.remove();
   }
 
-  // Definir callback global que Apps Script llamará
   window[cbName] = function(json) {
     cleanup();
     showTableLoading(false);
@@ -279,7 +272,6 @@ function loadAdminData() {
     renderTable();
   };
 
-  // Inyectar tag <script> con la URL del Apps Script + callback
   const script = document.createElement('script');
   script.id  = 'jsonp-script';
   script.src = SCRIPT_URL + '?callback=' + cbName;
@@ -296,12 +288,11 @@ function showTableLoading(show) {
   const noData = document.getElementById('no-data');
   if (!tbody) return;
   if (show) {
-    tbody.innerHTML = `<tr><td colspan="18" style="text-align:center; padding:2rem; color:#8896a7;">⏳ Cargando inscripciones...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="19" style="text-align:center; padding:2rem; color:#8896a7;">⏳ Cargando inscripciones...</td></tr>`;
     if (noData) noData.classList.add('hidden');
   }
 }
 
-/* ── Botón refrescar ── */
 function refreshData() {
   loadAdminData();
 }
@@ -313,7 +304,7 @@ function renderStats() {
   const pesoTotal   = players.reduce((s, p) => s + (parseFloat(p['Peso'])   || 0), 0);
   const avgAltura   = players.length ? (alturaTotal / players.length).toFixed(1) : '—';
   const avgPeso     = players.length ? (pesoTotal   / players.length).toFixed(1) : '—';
-  const ultima      = players.length ? players[players.length - 1]['Fecha Inscripción'] : '—';
+  const ultima      = players.length ? (players[players.length - 1]['Fecha Inscripción'] || '—') : '—';
 
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
@@ -422,11 +413,9 @@ async function doDelete() {
   try {
     await fetch(SCRIPT_URL, {
       method: 'POST',
-      mode:   'no-cors',
       body:   JSON.stringify({ action: 'delete', id: pendingDeleteId })
     });
     closeDeleteModal();
-    // Esperar un momento y recargar para reflejar el cambio
     setTimeout(() => loadAdminData(), 1500);
   } catch (err) {
     alert('❌ Error al eliminar: ' + err.message);
@@ -452,9 +441,8 @@ async function downloadExcel() {
   }
 
   const headers = [
-    'N°','Nombre','Apellido','Documento','Fecha Nacimiento',
-    'Edad','Género','Celular','Correo','Procedencia',
-    'Altura','Peso','Posición','Camiseta','Condiciones Médicas',
+    'N°','Nombre','Apellido','Documento','Edad','Género','Celular','Correo',
+    'Altura','Peso','Posición','Camiseta','Procedencia','Condiciones Médicas',
     'Link Consentimiento','Link Pago','Link ADRES',
     'Link Foto Derecha','Link Foto Izquierda','Link Foto Frente',
     'Fecha Inscripción'
@@ -465,16 +453,15 @@ async function downloadExcel() {
     p['Nombre']             || '',
     p['Apellido']           || '',
     p['Documento']          || '',
-    p['Fecha Nacimiento']   || '',
     p['Edad']               || '',
     p['Género']             || '',
     p['Celular']            || '',
     p['Correo']             || '',
-    p['Procedencia']        || '',
     p['Altura']             || '',
     p['Peso']               || '',
     p['Posición']           || '',
     p['Camiseta']           || '',
+    p['Procedencia']        || '',
     p['Condiciones Médicas']|| '',
     p['Link Consentimiento']|| '',
     p['Link Pago']          || '',
